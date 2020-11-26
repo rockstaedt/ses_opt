@@ -126,3 +126,5 @@ for v in model.component_objects(Var, active=True):
         print ("\t",index, varobject[index].value)
 
 pyo.value(model.OBJ)
+
+

@@ -20,7 +20,7 @@ if static_lambda:
     lamda = 21.97/100
 
 lmdas = np.arange(5,80,10)
-lmdas*0.01
+lmdas = lmdas*0.01
 # load values for 24 hours
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
 
@@ -40,7 +40,7 @@ pmax = np.array([20,40])
 ### Model Sensitivity Loop
 ###############################################################################
 objective_values = []
-objective_values = np.array(objective_values)
+
 
 for lmda in lmdas:
     # create concrete pyomo model
@@ -131,9 +131,13 @@ for lmda in lmdas:
             print ("\t",index, varobject[index].value)
 
 
-    objective_values = np.append(objective_values,pyo.value(model.OBJ))
+    objective_values.append(pyo.value(model.OBJ))
 
 
 
 
 objective_values
+
+fig, ax = plt.subplots()
+ax.plot(lmdas, objective_values)
+plt.show()
