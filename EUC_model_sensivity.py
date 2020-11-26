@@ -2,6 +2,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 from pyomo.core import Var
 import numpy as np
+import matplotlib.pyplot as plt
 
 ###############################################################################
 ### Model Options
@@ -17,6 +18,8 @@ static_lambda = True
 # retail electricity price in €/kWh
 if static_lambda:
     lamda = 21.97/100
+
+lmdas = np.arange(5,80,10)
 
 # load values for 24 hours
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
