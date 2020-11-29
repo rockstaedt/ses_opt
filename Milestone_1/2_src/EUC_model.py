@@ -10,7 +10,7 @@ import pandas as pd
 
 # enables sensitivity analysis regarding the elecitricity price from 5
 # to 75 in steps of 10
-sensitivity_analysis = False
+sensitivity_analysis = True
 
 # enables detailed output, recommended only without sensitivity analysis
 detailed_output = False
@@ -32,9 +32,9 @@ else:
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
 
 # fuel cost parameters
-c2 = np.array([1.2,1.12])*0.001
+c2 = np.array([1.2,1.12])*10**-3
 c1 = np.array([0.128,0.532])
-c  = np.array([2.12,12.8])*0.0001
+c  = np.array([2.12,12.8])*10**-5
 
 price_generators_kwh = [c2[g]*1**2 + c1[g]*1 + c[g] for g in range(0,2)]
 
