@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
 
+
 def monte_carlo(values, iterations):
     all_samples = []
 
@@ -39,7 +40,17 @@ plt.plot(range(24),res.mean(axis=0))
 
 
 size = 1000
-test = np.random.normal(pl[0], pl[0]*(1/3), size)
+costs = []
+for i in range(0,size):
+    load = np.random.normal(30, 30*(1/3))
+    if load <= 20:
+        # generate alone
+        costs.append(load*1.20)
+    else:
+        # purchase electrictiy from retail
+        costs.append(20*1.2 + 2*(load-20))
+
+sum(costs)/size
 
 plt.hist(test, bins=20)
 plt.title(f'{size} samples')
