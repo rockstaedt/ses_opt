@@ -87,7 +87,7 @@ print('Solutions for sub problem')
 
 results_sub = get_results(sub, dual=True)
 
-converging = convergence_check(
+converged = convergence_check(
     objective,
     master_prob,
     results_master['x'],
@@ -96,7 +96,7 @@ converging = convergence_check(
     epsilon=epsilon
 )
 
-while not converging:
+while not converged:
     iteration += 1
     print()
     print('--> Not converging. Next iteration.')
@@ -122,7 +122,7 @@ while not converging:
     print('Solutions for sub problem')
     results_sub = get_results(sub, dual=True)
 
-    converging = convergence_check(
+    converged = convergence_check(
     objective,
     master_prob,
     results_master['x'],
@@ -141,3 +141,7 @@ results_master = get_results(master)
 
 print('Solutions for sub problem')
 results_sub = get_results(sub, dual=True)
+
+z = objective(results_master['x'], results_sub['y'])
+
+print(f'\t z = {z}')
