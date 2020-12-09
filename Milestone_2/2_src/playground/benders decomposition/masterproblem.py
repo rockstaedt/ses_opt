@@ -5,29 +5,29 @@ from pyomo.core import Var, value
 # create concrete pyomo model
 model = pyo.ConcreteModel()
 
-model.x_1= pyo.Var()
+model.x = pyo.Var()
 
-model.x_2 = pyo.Var()
+model.alpha = pyo.Var()
 
 model.OBJ = pyo.Objective(
-    expr=-24*model.x_1-28*model.x_2
+    expr=-1/4*model.x + model.alpha
 )
 
 def con1(model):
-    return 6*model.x_1 + 10*model.x_2 <= 2400
+    return -19/2 + 1/2*(model.x - 16) <= model.alpha
 model.con1 = pyo.Constraint(rule=con1)
 
 def con2(model):
-    return 8*model.x_1 + 5*model.x_2 <= 1600
+    return (0, model.x, 16)
 model.con2 = pyo.Constraint(rule=con2)
 
 def con3(model):
-    return (0, model.x_1, 500)
+    return -25 <= model.alpha
 model.con3 = pyo.Constraint(rule=con3)
 
 def con4(model):
-    return (0, model.x_2, 100)
-model.con3 = pyo.Constraint(rule=con4)
+    return -5 - 1*(model.x - 0) <= model.alpha
+model.con4 = pyo.Constraint(rule=con4)
 
 opt = pyo.SolverFactory('gurobi')
 
