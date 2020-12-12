@@ -28,6 +28,8 @@ def get_results(model, dual=False, write=True):
                     dic2 = {}
                     for i in range(0, 24):
                         dic2[i] = 0
+                        if write:
+                            print('\tLambda', c, i, 0)
                 dic[str(c)] = dic2
     return dic
 
@@ -37,4 +39,6 @@ def convergence_check(objective, master_prob, u, p1, pg, p2, alpha,
     print(f'Upper Bound: {upper_bound}')
     lower_bound = master_prob(u, p1, alpha)
     print(f'Lower Bound: {lower_bound}')
-    return not upper_bound-lower_bound > epsilon
+    diff = abs(upper_bound - lower_bound)
+    print(f'Difference: {diff}')
+    return not abs(upper_bound-lower_bound) > epsilon

@@ -1,24 +1,43 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 from pyomo.core import Var, value
+import time as tm
 
 from bender_helper_ms import *
+
+###############################################################################
+### Model Options
+###############################################################################
 
 epsilon = 0.0001
 
 opt = pyo.SolverFactory('gurobi')
 
+###############################################################################
+### Parameters
+###############################################################################
 
-# Parameters
-c1 = 2.12*0.00001
+# fixed generator costs in $/h
+c1 = 2.12*10**-5
+
+# linear generator costs in $/kWh
 c2 = 0.128
+
+# maximum capacity of generator
 pmax = 12
 
+# electricity price forward contract in $/kWh
 l1 = 0.25
+
+# electricity price real time contract in $/kWh
 l2 = 0.3
 
-# load values
+# load values in kW
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
+
+###############################################################################
+### Benders decomposition
+###############################################################################
 
 def objective(u, p1, pg, p2):
     return sum(c1*u[h] + l1*p1[h] + c2*pg[h] + l2*p2[h] for h in range(0, 24))
@@ -35,8 +54,7 @@ master.H = pyo.RangeSet(0, 23)
 
 master.u = pyo.Var(master.H, within=pyo.Binary)
 master.p1 = pyo.Var(master.H, within=pyo.NonNegativeReals)
-# negative bound is zero, thats why no constraint is needed
-master.alpha = pyo.Var(master.H, within=pyo.NonNegativeReals)
+master.alpha = pyo.Var(master.H)
 
 def master_obj(master):
     return sum(
@@ -44,8 +62,14 @@ def master_obj(master):
     )
 master.OBJ = pyo.Objective(rule=master_obj)
 
+# alpha down (-500) is an arbitrary selected bound
+def alphacon1(master, H):
+    return master.alpha[H] >= -500
+master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
 
 # First iteration
+start_time = tm.time()
+
 iteration = 0
 print('######################################################################')
 print('Initialization')
@@ -65,8 +89,10 @@ sub = pyo.ConcreteModel()
 #Hour Set
 sub.H = pyo.RangeSet(0,23)
 
-sub.u = pyo.Var(sub.H, within=pyo.Binary)
-sub.p1 = Var(sub.H, within=pyo.NonNegativeReals)
+# no need for declaration of variable types because that is determined by
+# corresponding variables of master problem
+sub.u = pyo.Var(sub.H)
+sub.p1 = Var(sub.H)
 
 sub.pg = pyo.Var(sub.H, within=pyo.NonNegativeReals)
 sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
@@ -84,11 +110,11 @@ def con_max(sub, H):
 sub.con_max = pyo.Constraint(sub.H, rule=con_max)
 
 def dual_con1(sub, H):
-    return sub.u[H] == bool(results_master['u'][H])
+    return sub.u[H] == results_master['u'][H]
 sub.dual_con1 = pyo.Constraint(sub.H, rule=dual_con1)
 
 def dual_con2(sub, H):
-    return sub.p1[H] == bool(results_master['p1'][H])
+    return sub.p1[H] == results_master['p1'][H]
 sub.dual_con2 = pyo.Constraint(sub.H, rule=dual_con2)
 
 sub.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
@@ -110,7 +136,7 @@ converged = convergence_check(
     epsilon=epsilon
 )
 
-if not converged:
+while not converged:
     iteration += 1
     print()
     print('--> Not converging. Next iteration.')
@@ -130,20 +156,18 @@ if not converged:
         )
 
     setattr(master, f'cut_{iteration}', pyo.Constraint(master.H, rule=cut))
-    master.cut_1.pprint()
     print(f'Added cut_{iteration}')
 
     solve_model(opt, master)
     print('Solutions for master problem')
-    results_master = get_results(master)
+    results_master = get_results(master, write=False)
 
     # update dual constraint in sub problem
     sub.dual_con1.reconstruct()
     sub.dual_con2.reconstruct()
     solve_model(opt, sub)
-    sub.dual.display()
     print('Solutions for sub problem')
-    results_sub = get_results(sub, dual=True)
+    results_sub = get_results(sub, dual=True, write=False)
 
     converged = convergence_check(
         objective,
@@ -157,13 +181,16 @@ if not converged:
     )
 
 
-# print('######################################################################')
-# print('######################################################################')
-# print('END RESULTS')
-# print()
+print('######################################################################')
+print('######################################################################')
+print('END RESULTS')
+print()
 
-# print('Solutions for master problem')
-# results_master = get_results(master)
+print('Solutions for master problem')
+results_master = get_results(master)
 
-# print('Solutions for sub problem')
-# results_sub = get_results(sub, dual=True)
+print('Solutions for sub problem')
+results_sub = get_results(sub, dual=True)
+
+time_end = tm.time()
+print(time_end - start_time)
