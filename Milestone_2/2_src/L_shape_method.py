@@ -1,6 +1,7 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 import time as tm
+import numpy as np
 
 from helper import *
 
@@ -10,10 +11,13 @@ from helper import *
 
 # enables sensitivity analysis regarding the elecitricity price of the real
 # time contract from 15 to 35 in steps of 5
-sensitivity_analysis = True
+sensitivity_analysis = False
+
+# enables the output of csv files, saved into '2_results'
+csv_output = True
 
 # sample size for monte carlo simulation
-sample_size = 5
+sample_size = 100
 
 ###############################################################################
 ### Parameters
@@ -47,7 +51,7 @@ HOURS = list(range(0, len(LOADS)))
 epsilon = 0.0001
 
 ###############################################################################
-### Benders decomposition
+### L-shape method
 ###############################################################################
 
 # solver for MIP
@@ -55,6 +59,12 @@ opt = pyo.SolverFactory('gurobi')
 
 # list for the differences of the bounds
 bounds_difference = []
+
+# list for the objective values
+objective_values = []
+
+# list for lower bound values
+lower_bounds = []
 
 #------------------------------------------------------------------------------
 # Helper functions
@@ -231,10 +241,8 @@ for i, sample in enumerate(SAMPLES):
     solve_model(opt, sub)
     results_sub[i] = get_results(sub, dual=True)
 
-print('Done.')
-
 # check if upper and lower bound are converging
-converged, diff = convergence_check(
+converged, upper_bound, lower_bound = convergence_check(
     objective,
     master_prob,
     results_master,
@@ -245,7 +253,11 @@ converged, diff = convergence_check(
 
 print_convergence(converged)
 
-bounds_difference.append(diff)
+bounds_difference.append(abs(upper_bound - lower_bound))
+
+objective_values.append(upper_bound)
+
+lower_bounds.append(lower_bound)
 
 # optimize until upper and lower bound are converging
 while not converged:
@@ -290,7 +302,7 @@ while not converged:
         solve_model(opt, sub)
         results_sub[i] = get_results(sub, dual=True)
 
-    converged, diff = convergence_check(
+    converged, diff, upper_bound = convergence_check(
         objective,
         master_prob,
         results_master,
@@ -301,24 +313,52 @@ while not converged:
 
     print_convergence(converged)
 
-    bounds_difference.append(diff)
+    bounds_difference.append(abs(upper_bound - lower_bound))
 
+    objective_values.append(upper_bound)
+
+    lower_bounds.append(lower_bound)
+
+###############################################################################
+### Results
+###############################################################################
 
 print_caption('End Results')
 
-print('Solutions for master problem')
-results_master = get_results(master, write=True)
+# not sure, if this is correct
+# print('Variables:')
+# results_sub = get_results(sub, write=True)
 
-print('Solutions for sub problem')
-results_sub = get_results(sub, dual=True, write=True)
-
-objective_value = objective(
-        results_master['u'], results_master['p1'],
-        results_sub['pg'], results_sub['p2']
-)
+objective_value = objective_values[-1]
 print()
-print(f'Objective value: {objective_value}')
+print('Objective value:')
+print(f'\t{round(objective_value, 2)}$')
 
 time_end = tm.time()
 print()
-print(time_end - time_start)
+print('Computation time')
+print(f'\t{round(time_end - time_start, 2)}s')
+
+###############################################################################
+### Exports
+###############################################################################
+
+if sensitivity_analysis:
+    prefix = '_sensitivity.csv'
+else:
+    prefix = '_no_sensitivity.csv'
+
+if csv_output:
+    # export objective values, difference between bound into '3_results' as CSV
+    np.array(objective_values).tofile(
+        '../3_results/objective_values' + prefix,
+        sep = ','
+    )
+    np.array(lower_bounds).tofile(
+        '../3_results/lower_bounds' + prefix,
+        sep = ','
+    )
+    np.array(bounds_difference).tofile(
+        '../3_results/bounds_differences' + prefix,
+        sep = ','
+    )
