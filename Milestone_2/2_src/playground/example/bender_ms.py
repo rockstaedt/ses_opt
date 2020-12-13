@@ -2,6 +2,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 from pyomo.core import Var, value
 import time as tm
+import numpy as np
 
 from bender_helper_ms import *
 
@@ -40,7 +41,7 @@ pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
 # Monte Carlo sampling
 ###############################################################################
 # covariance matrix of pl
-cov_pl = np.diagflat(1/3*pl)
+cov_pl = np.diagflat(np.array(pl)*1/3)
 # 1000 random samples from normal distribution
 samples = np.random.multivariate_normal(pl, cov_pl, size= 1000)
 
