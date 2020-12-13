@@ -127,5 +127,8 @@ def convergence_check(objective, master_prob, results_master, results_sub,
         results_master['p1'],
         results_master['alpha']
     )
-    diff = abs(upper_bound - lower_bound)
-    return (not diff > epsilon, diff)
+    return (
+        not abs(upper_bound - lower_bound) > epsilon,
+        upper_bound,
+        lower_bound
+    )
