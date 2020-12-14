@@ -2,6 +2,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 import time as tm
 import numpy as np
+import json
 
 import helper
 
@@ -17,7 +18,7 @@ sensitivity_analysis = True
 csv_output = True
 
 # sample size for monte carlo simulation
-sample_size = 10
+sample_size = 1000
 
 ###############################################################################
 ### Parameters
@@ -340,6 +341,12 @@ for l2 in l2s:
     ############################################################################
 
     helper.print_caption('End Results')
+
+    with open(f'../3_results/results_sub_{l2}.json', 'w') as outfile:
+        json.dump(results_sub, outfile)
+
+    with open(f'../3_results/results_master_{l2}.json', 'w') as outfile:
+        json.dump(results_master, outfile)
 
     # not sure, if this is correct
     # print('Variables:')
