@@ -21,6 +21,9 @@ csv_output = True
 # sample size for monte carlo simulation
 sample_size = 1000
 
+# setnseed for randomness
+seed = 12
+
 ###############################################################################
 ### Parameters
 ###############################################################################
@@ -51,7 +54,7 @@ else:
 LOADS = helper.get_loads()
 
 # monte carlo samples
-SAMPLES = helper.get_monte_carlo_samples(LOADS, samples=sample_size)
+SAMPLES = helper.get_monte_carlo_samples(LOADS, samples=sample_size, seed=seed)
 
 # hours
 HOURS = list(range(0, len(LOADS)))
@@ -401,3 +404,5 @@ if csv_output:
     df_time = pd.DataFrame(times_dic)
     df_time.to_csv('../3_results/computation_times.csv', index=False)
     # save samples as csv
+    df_samples = pd.DataFrame(SAMPLES)
+    df_samples.to_csv('../3_results/samples.csv', index=False)
