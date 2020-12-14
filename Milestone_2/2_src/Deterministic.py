@@ -85,7 +85,7 @@ times_dic = {'l2': [], 'time': []}
 # loop over all real time prices and solve the L-shape method
 for l2 in l2s:
 
-    helper.print_sens_step(f'Solve L-Shape method for {l2} $/kWh')
+    helper.print_sens_step(f'Solve benders decomposition for {l2} $/kWh')
 
     #---------------------------------------------------------------------------
     # Helper variables
