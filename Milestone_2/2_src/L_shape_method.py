@@ -3,7 +3,7 @@ from pyomo.opt import SolverFactory
 import time as tm
 import numpy as np
 
-from helper import *
+import helper
 
 ###############################################################################
 ### Model Options
@@ -49,7 +49,7 @@ else:
 LOADS = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
 
 # monte carlo samples
-SAMPLES = get_monte_carlo_samples(LOADS, samples=sample_size)
+SAMPLES = helper.get_monte_carlo_samples(LOADS, samples=sample_size)
 
 # hours
 HOURS = list(range(0, len(LOADS)))
@@ -86,7 +86,7 @@ def master_prob(u, p1, alpha):
 # loop over all real time prices and solve the L-shape method
 for l2 in l2s:
 
-    print_sens_step(f'Solve L-Shape method for {l2} $/kWh')
+    helper.print_sens_step(f'Solve L-Shape method for {l2} $/kWh')
 
     #---------------------------------------------------------------------------
     # Helper variables
@@ -158,13 +158,13 @@ for l2 in l2s:
     # initialize iteration counter
     iteration = 0
 
-    print_caption('Initialization')
+    helper.print_caption('Initialization')
 
     print('Solving master problem...')
 
-    solve_model(opt, master)
+    helper.solve_model(opt, master)
 
-    results_master = get_results(master)
+    results_master = helper.get_results(master)
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ for l2 in l2s:
     # no need for declaration of variable types because that is determined by
     # corresponding variables of master problem
     sub.u = pyo.Var(sub.H)
-    sub.p1 = Var(sub.H)
+    sub.p1 = pyo.Var(sub.H)
 
     # Second stage variables
 
@@ -245,7 +245,7 @@ for l2 in l2s:
 
     results_sub = {}
     for i, sample in enumerate(SAMPLES):
-        print_status(i)
+        helper.print_status(i)
         # filter for first sample because that is set in the initialization of
         # the model
         if i != 0:
@@ -254,11 +254,11 @@ for l2 in l2s:
             # update constraint
             sub.con_load.reconstruct()
         # solve model
-        solve_model(opt, sub)
-        results_sub[i] = get_results(sub, dual=True)
+        helper.solve_model(opt, sub)
+        results_sub[i] = helper.get_results(sub, dual=True)
 
     # check if upper and lower bound are converging
-    converged, upper_bound, lower_bound = convergence_check(
+    converged, upper_bound, lower_bound = helper.convergence_check(
         objective,
         master_prob,
         results_master,
@@ -267,7 +267,7 @@ for l2 in l2s:
         epsilon=epsilon
     )
 
-    print_convergence(converged)
+    helper.print_convergence(converged)
 
     bounds_difference.append(abs(upper_bound - lower_bound))
 
@@ -279,7 +279,7 @@ for l2 in l2s:
     while not converged:
         iteration += 1
 
-        print_caption(f'Iteration {iteration}')
+        helper.print_caption(f'Iteration {iteration}')
 
         def cut(master, H):
             return (
@@ -298,8 +298,8 @@ for l2 in l2s:
         print(f'Added cut_{iteration}')
 
         print('Solving master problem...')
-        solve_model(opt, master)
-        results_master = get_results(master)
+        helper.solve_model(opt, master)
+        results_master = helper.get_results(master)
 
         # update dual constraint in sub problem
         sub.dual_con1.reconstruct()
@@ -310,15 +310,15 @@ for l2 in l2s:
         for i, sample in enumerate(SAMPLES):
             # no if statement here because constraint con load is reconstructed
             # with the first sample in samples
-            print_status(i)
+            helper.print_status(i)
             pl = sample
             # update constraint
             sub.con_load.reconstruct()
             # solve model
-            solve_model(opt, sub)
-            results_sub[i] = get_results(sub, dual=True)
+            helper.solve_model(opt, sub)
+            results_sub[i] = helper.get_results(sub, dual=True)
 
-        converged, upper_bound, lower_bound = convergence_check(
+        converged, upper_bound, lower_bound = helper.convergence_check(
             objective,
             master_prob,
             results_master,
@@ -327,7 +327,7 @@ for l2 in l2s:
             epsilon=epsilon
         )
 
-        print_convergence(converged)
+        helper.print_convergence(converged)
 
         bounds_difference.append(abs(upper_bound - lower_bound))
 
@@ -339,7 +339,7 @@ for l2 in l2s:
     ### Results
     ############################################################################
 
-    print_caption('End Results')
+    helper.print_caption('End Results')
 
     # not sure, if this is correct
     # print('Variables:')
