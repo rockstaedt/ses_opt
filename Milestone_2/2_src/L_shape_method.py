@@ -3,6 +3,7 @@ from pyomo.opt import SolverFactory
 import time as tm
 import numpy as np
 import json
+import pandas as pd
 
 import helper
 
@@ -83,6 +84,9 @@ def master_prob(u, p1, alpha):
     This function calculates the lower bound of the decomposition.
     """
     return sum(c1*u[h] + l1*p1[h] + alpha[h] for h in HOURS)
+
+# dataframe for computation times
+times_dic = {'l2': [], 'time': []}
 
 # loop over all real time prices and solve the L-shape method
 for l2 in l2s:
@@ -348,17 +352,9 @@ for l2 in l2s:
     with open(f'../3_results/results_master_{l2}.json', 'w') as outfile:
         json.dump(results_master, outfile)
 
-    # not sure, if this is correct
-    # print('Variables:')
-    # results_sub = get_results(sub, write=True)
-
-    objective_value = objective_values[-1]
-    print()
-    print('Objective value:')
-    print(f'\t{round(objective_value, 2)}$')
-
     time_end = tm.time()
-    print()
+    times_dic['l2'].append(str(l2))
+    times_dic['time'].append(time_end - time_start)
     print('Computation time:')
     print(f'\t{round(time_end - time_start, 2)}s')
 
@@ -395,5 +391,13 @@ for l2 in l2s:
 
 if sensitivity_analysis:
     time_end_sens = tm.time()
+    times_dic['l2'].append('ALL')
+    times_dic['time'].append(time_end_sens - time_start_sens)
     print('Computation time for sensitivity analysis:')
     print(f'\t{round(time_end_sens - time_start_sens, 2)}s')
+
+if csv_output:
+    # save computation times as csv
+    df_time = pd.DataFrame(times_dic)
+    df_time.to_csv('../3_results/computation_times.csv', index=False)
+    # save samples as csv
