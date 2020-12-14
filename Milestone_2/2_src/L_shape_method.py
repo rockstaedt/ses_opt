@@ -48,7 +48,7 @@ else:
     l2s = [0.3]
 
 # load values in kW
-LOADS = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
+LOADS = helper.get_loads()
 
 # monte carlo samples
 SAMPLES = helper.get_monte_carlo_samples(LOADS, samples=sample_size)
