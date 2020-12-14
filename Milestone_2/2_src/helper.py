@@ -140,3 +140,8 @@ def convergence_check(objective, master_prob, results_master, results_sub,
         upper_bound,
         lower_bound
     )
+
+def get_loads():
+    return [
+        8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
+    ]
