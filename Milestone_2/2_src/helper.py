@@ -2,12 +2,14 @@ import pyomo.environ as pyo
 from pyomo.core import Var, value
 import numpy as np
 
-def get_monte_carlo_samples(values:list, samples=1000):
+def get_monte_carlo_samples(values:list, samples=1000, seed=12):
     """
     This function creates a monte carlo sample of size samples. For every
     element in values, a sample is drawn from a normal distribution with the
     elements value as mean and one third from the elements value as deviation.
     """
+    # set seed
+    np.random.seed(seed)
     # covariance matrix of pl
     cov_pl = np.diagflat(np.array(values)*1/3)
 
