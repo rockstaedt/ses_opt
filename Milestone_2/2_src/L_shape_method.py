@@ -21,7 +21,7 @@ csv_output = True
 # sample size for monte carlo simulation
 sample_size = 1000
 
-# setnseed for randomness
+# set seed for randomness
 seed = 12
 
 ###############################################################################
