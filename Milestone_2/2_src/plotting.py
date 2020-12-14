@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 ###############################################################################
 ### Matplotlib Settings
@@ -42,3 +43,10 @@ plt.plot(iterations, bounds_differences)
 plt.grid()
 plt.yscale("log")
 plt.show()
+
+# Opening JSON file
+f = open('../3_results/results_sub_0.2.json',)
+
+# returns JSON object as
+# a dictionary
+data = json.load(f)
