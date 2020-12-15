@@ -322,3 +322,86 @@ plt.savefig(
     dpi=dpi,
     bbox_inches='tight'
 )
+
+## ANSWER QUESTION FROM PRESENTATION REGARDING HIGHER REAL TIME COSTS IN
+## STOCHASTIC MODEL
+
+f = open('../3_results/testing_Deterministic_results_0.3.json',)
+
+# returns JSON object as
+# a dictionary
+data = json.load(f)
+
+pg_list = []
+p1_list = []
+p2_list = []
+
+for sample, dic_var in data.items():
+    pg = 0
+    p1 = 0
+    p2 = 0
+    for var, dic_values in dic_var.items():
+        if var == 'pg':
+            for hour, value in dic_values.items():
+                pg += float(value)
+        if var == 'p1':
+            for hour, value in dic_values.items():
+                p1 += float(value)
+        if var == 'p2':
+            for hour, value in dic_values.items():
+                p2 += float(value)
+    pg_list.append(pg)
+    p1_list.append(p1)
+    p2_list.append(p2)
+
+print('DETERMINISTIC')
+
+mean_p1_deter = np.mean(np.array(p1_list))
+print(mean_p1_deter)
+
+mean_pg_deter = np.mean(np.array(pg_list))
+print(mean_pg_deter)
+
+mean_p2_deter = np.mean(np.array(p2_list))
+print(mean_p2_deter)
+
+print('##########################')
+
+f = open('../3_results/testing_Stochastic_results_0.3.json',)
+
+# returns JSON object as
+# a dictionary
+data = json.load(f)
+
+pg_list = []
+p1_list = []
+p2_list = []
+
+for sample, dic_var in data.items():
+    pg = 0
+    p1 = 0
+    p2 = 0
+    for var, dic_values in dic_var.items():
+        if var == 'pg':
+            for hour, value in dic_values.items():
+                pg += float(value)
+        if var == 'p1':
+            for hour, value in dic_values.items():
+                p1 += float(value)
+        if var == 'p2':
+            for hour, value in dic_values.items():
+                p2 += float(value)
+    pg_list.append(pg)
+    p1_list.append(p1)
+    p2_list.append(p2)
+
+print('STOCHASTIC')
+
+mean_p1_stoch = np.mean(np.array(p1_list))
+print(mean_p1_stoch)
+
+mean_pg_stoch = np.mean(np.array(pg_list))
+print(mean_pg_stoch)
+
+mean_p2_stoch = np.mean(np.array(p2_list))
+print(mean_p2_stoch)
