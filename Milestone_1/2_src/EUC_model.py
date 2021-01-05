@@ -30,13 +30,15 @@ else:
 
 # load values for 24 hours
 pl = [8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12]
+pl_sum = sum(pl)
 
 # fuel cost parameters
 c2 = np.array([1.2,1.12])*10**-3
 c1 = np.array([0.128,0.532])
-c  = np.array([2.12,12.8])*10**-5
+c  = np.array([2.12,1.28])*10**-5
 
-price_generators_kwh = [c2[g]*1**2 + c1[g]*1 + c[g] for g in range(0,2)]
+# derive cost function for generator
+price_generators_kwh = [c2[g]*2*1 + c1[g] for g in range(0,2)]
 
 # min max power values
 pmin = np.array([0,0])
@@ -46,8 +48,14 @@ pmax = np.array([20,40])
 ### Model
 ###############################################################################
 
-# create list for objective values
+# create empty lists
 objective_values = []
+net_costs = []
+# fuel costs is a dictionary of lists with key equal to generator index
+fuel_costs = {
+    0: [],
+    1: []
+}
 
 # loop through lambdas
 for lamda in lmbdas:
@@ -176,14 +184,54 @@ for lamda in lmbdas:
     df_retailer = pd.DataFrame(data_dic_retailer)
     df_generator = pd.DataFrame(data_dic_generator)
 
-    # export dataframes into '2_results' as CSV
+    # export dataframes into '3_results' as CSV
     df_retailer.to_csv(
-        '../3_results/results_retailer_lambda_' + str(round(lamda, 4)) + '.csv',
+        '../3_results/retailer_lambda_'
+        + str(round(lamda, 4)) + '.csv',
         index=False
     )
     df_generator.to_csv(
-        '../3_results/results_generator_lambda_' + str(round(lamda, 4)) + '.csv',
+        '../3_results/generator_lambda_'
+        + str(round(lamda, 4)) + '.csv',
         index=False
     )
 
+    # save objective value
     objective_values.append(pyo.value(model.OBJ))
+
+    # calculate and save fuel costs and net costs
+    net_costs.append(df_retailer['Import/Export'].sum()*lamda)
+    for g in range(0,2):
+        df_generator['Costs'] = df_generator.apply(
+            lambda x:
+                (
+                    c2[g]*x.Generation**2 + c1[g]*x.Generation + c[g]
+                )*x['Unit commitment'],
+            axis=1
+        )
+        fuel_costs[g].append(
+            df_generator[df_generator.Generator == g].Costs.sum()
+        )
+
+if sensitivity_analysis:
+    prefix = '_sensitivity.csv'
+else:
+    prefix = '_no_sensitivity.csv'
+
+# export objective values, fuel costs and net costs into '3_results' as CSV
+np.array(objective_values).tofile(
+    '../3_results/objective_values' + prefix,
+    sep = ','
+)
+np.array(fuel_costs[0]).tofile(
+    '../3_results/fuel_costs_generator1' + prefix,
+    sep = ','
+)
+np.array(fuel_costs[1]).tofile(
+    '../3_results/fuel_costs_generator2' + prefix,
+    sep = ','
+)
+np.array(net_costs).tofile(
+    '../3_results/net_costs' + prefix,
+    sep = ','
+)

@@ -10,7 +10,7 @@ from matplotlib.lines import Line2D
 settings = {
     'text.usetex': True,
     'font.weight' : 'normal',
-    'font.size'   : 20
+    'font.size'   : 14
 }
 plt.rcParams.update(**settings)
 
@@ -18,7 +18,7 @@ plt.rcParams.update(**settings)
 dpi = 300
 
 # path to csv files
-path = '../3_results/results_'
+path = '../3_results/'
 
 # saving path
 saving_path = '../4_plots/'
@@ -100,7 +100,7 @@ consumption_stacked = np.vstack(
 )
 
 # plot
-fig, ax = plt.subplots(figsize=(12,8))
+fig, ax = plt.subplots(figsize=(6,4))
 # production
 ax.stackplot(
     t,
@@ -131,12 +131,12 @@ plt.savefig(
 )
 
 ###############################################################################
-### Solution for sensitivity analysis
+### Sensitivity analysis - Energy balance
 ###############################################################################
 
 lamdas = np.arange(5,80,10)*0.01
 
-fig, ax = plt.subplots(4,2,figsize=(26,16))
+fig, ax = plt.subplots(4,2,figsize=(13,8))
 
 row = 0
 col = 0
@@ -216,8 +216,10 @@ for lamda in lamdas:
         color='red',
         label='Demand'
     )
-    ax[row][col].set_title(f'Lambda: {round(lamda, 4)}')
-    #ax.set_title(model_type_to_description[model_type] + ' - ' + time_period)
+    ax[row][col].set_title(
+        r'$\lambda$ = '
+        + str(round(lamda, 4))
+    )
     ax[row][col].grid()
 
     col += 1
@@ -244,6 +246,120 @@ fig.tight_layout()
 
 plt.savefig(
     saving_path + 'balance_plot_sensitivity.png',
+    dpi=dpi,
+    bbox_inches='tight'
+)
+
+###############################################################################
+### Sensitivity analysis - Objective value
+###############################################################################
+
+objective_values = np.loadtxt(
+     fname=path + 'objective_values_sensitivity.csv',
+     delimiter=','
+)
+fuel_costs_generator1 = np.loadtxt(
+     fname=path + 'fuel_costs_generator1_sensitivity.csv',
+     delimiter=','
+)
+fuel_costs_generator2 = np.loadtxt(
+     fname=path + 'fuel_costs_generator2_sensitivity.csv',
+     delimiter=','
+)
+net_costs = np.loadtxt(
+     fname=path + 'net_costs_sensitivity.csv',
+     delimiter=','
+)
+
+fig, ax = plt.subplots(2,figsize=(13,8))
+
+# set width
+width = 0.04
+
+# set x values for first 5 values
+x = np.array([round(lamda,2) for lamda in lamdas[:5]])
+
+ax[0].bar(
+    x - width/2,
+    objective_values[:5],
+    width=width,
+    label='Objective value',
+    color='grey'
+)
+ax[0].bar(
+    x + width/2,
+    net_costs[:5],
+    width=width,
+    label='Net costs',
+    color='darkorange'
+)
+ax[0].bar(
+    x + width/2,
+    fuel_costs_generator1[:5],
+    width=width,
+    label='Fuel cost generator 1',
+    color='mediumblue',
+    bottom=net_costs[:5]
+)
+ax[0].bar(
+    x + width/2,
+    fuel_costs_generator2[:5],
+    width=width,
+    label='Fuel cost generator 2',
+    color='forestgreen',
+    bottom=fuel_costs_generator2[:5]
+)
+ax[0].set_ylabel(r'\$')
+ax[0].set_xticks(x)
+ax[0].grid()
+ax[0].legend(
+    loc = "upper left",
+    bbox_to_anchor=(1,1)
+)
+
+# set x values for last 4 values
+x = np.array([round(lamda,2) for lamda in lamdas[5:]])
+
+ax[1].bar(
+    x - width/2,
+    objective_values[5:],
+    width=width,
+    label='Objective value',
+    color='grey'
+)
+ax[1].bar(
+    x + width/2,
+    net_costs[5:],
+    width=width,
+    label='Net costs',
+    color='darkorange'
+)
+ax[1].bar(
+    x + width/2,
+    fuel_costs_generator1[5:],
+    width=width,
+    label='Fuel cost generator 1',
+    color='mediumblue',
+    bottom=0
+)
+ax[1].bar(
+    x + width/2,
+    fuel_costs_generator2[5:],
+    width=width,
+    label='Fuel cost generator 2',
+    color='forestgreen',
+    bottom=fuel_costs_generator1[5:]
+)
+ax[1].set_ylabel(r'\$')
+ax[1].set_xlabel(r'$\lambda$')
+ax[1].set_xticks(x)
+ax[1].grid()
+
+# for better layout
+fig.tight_layout()
+
+plt.savefig(
+    saving_path + 'costs_sensitivity.png',
     dpi=dpi,
     bbox_inches='tight'
 )
