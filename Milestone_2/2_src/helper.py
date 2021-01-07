@@ -40,49 +40,17 @@ def print_convergence(converged:bool):
         print('--> Converged. Stop algorithm.')
         print()
 
-def print_status(i:int):
+def print_status(counter:int, i:int):
     # increase by one because index of samples starts with zero
     i += 1
-    if i < 100:
+    if counter < 100:
         print('.', end='')
-    elif i == 100:
+        counter += 1
+        return counter
+    else:
         print(i)
-    elif i < 200:
-        print('.', end='')
-    elif i == 200:
-        print(i)
-    elif i < 300:
-        print('.', end='')
-    elif i == 300:
-        print(i)
-    elif i < 400:
-        print('.', end='')
-    elif i == 400:
-        print(i)
-    elif i < 500:
-        print('.', end='')
-    elif i == 500:
-        print(i)
-    elif i < 600:
-        print('.', end='')
-    elif i == 600:
-        print(i)
-    elif i < 700:
-        print('.', end='')
-    elif i == 700:
-        print(i)
-    elif i < 800:
-        print('.', end='')
-    elif i == 800:
-        print(i)
-    elif i < 900:
-        print('.', end='')
-    elif i == 900:
-        print(i)
-    elif i < 1000:
-        print('.', end='')
-    elif i == 1000:
-        print(i)
+        counter = 1
+        return counter
 
 
 def solve_model(solver, model):
