@@ -5,7 +5,7 @@ import numpy as np
 import json
 import pandas as pd
 
-import helper
+import opt_helper
 
 ###############################################################################
 ### Model Options
@@ -13,10 +13,10 @@ import helper
 
 # enables sensitivity analysis regarding the elecitricity price of the real
 # time contract from 15 to 35 in steps of 5
-sensitivity_analysis = True
+sensitivity_analysis = False
 
 # enables the output of csv files, saved into '3_results'
-csv_output = True
+csv_output = False
 
 ###############################################################################
 ### Parameters
@@ -45,7 +45,7 @@ else:
     l2s = [0.3]
 
 # load values in kW
-LOADS = helper.get_loads()
+LOADS = opt_helper.get_loads()
 
 # hours
 HOURS = list(range(0, len(LOADS)))
@@ -61,7 +61,7 @@ epsilon = 0.0001
 opt = pyo.SolverFactory('gurobi')
 
 #------------------------------------------------------------------------------
-# Helper functions
+# opt_helper functions
 #------------------------------------------------------------------------------
 
 def objective(u, p1, pg, p2):
@@ -85,20 +85,20 @@ times_dic = {'l2': [], 'time': []}
 # loop over all real time prices and solve the L-shape method
 for l2 in l2s:
 
-    helper.print_sens_step(f'Solve benders decomposition for {l2} $/kWh')
+    opt_helper.print_sens_step(f'Solve benders decomposition for {l2} $/kWh')
 
     #---------------------------------------------------------------------------
     # Helper variables
     #---------------------------------------------------------------------------
-
-    # list for the differences of the bounds
-    bounds_difference = []
 
     # list for the objective values
     objective_values = []
 
     # list for lower bound values
     lower_bounds = []
+
+    # list for the differences of the bounds
+    upper_bounds = []
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -157,13 +157,13 @@ for l2 in l2s:
     # initialize iteration counter
     iteration = 0
 
-    helper.print_caption('Initialization')
+    opt_helper.print_caption('Initialization')
 
     print('Solving master problem...')
 
-    helper.solve_model(opt, master)
+    opt_helper.solve_model(opt, master)
 
-    results_master = helper.get_results(master)
+    results_master = opt_helper.get_results(master)
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -278,12 +278,12 @@ for l2 in l2s:
 
     print('Solving sub problem...')
 
-    helper.solve_model(opt, sub)
+    opt_helper.solve_model(opt, sub)
     results_sub = {}
-    results_sub[0] = helper.get_results(sub, dual=True)
+    results_sub[0] = opt_helper.get_results(sub, dual=True)
 
     # check if upper and lower bound are converging
-    converged, upper_bound, lower_bound = helper.convergence_check(
+    converged, upper_bound, lower_bound = opt_helper.convergence_check(
         objective,
         master_prob,
         results_master,
@@ -292,7 +292,7 @@ for l2 in l2s:
         epsilon=epsilon
     )
 
-    helper.print_convergence(converged)
+    opt_helper.print_convergence(converged)
 
     bounds_difference.append(abs(upper_bound - lower_bound))
 
@@ -304,7 +304,7 @@ for l2 in l2s:
     while not converged:
         iteration += 1
 
-        helper.print_caption(f'Iteration {iteration}')
+        opt_helper.print_caption(f'Iteration {iteration}')
 
         def cut(master, H):
             return (
@@ -320,8 +320,8 @@ for l2 in l2s:
         print(f'Added cut_{iteration}')
 
         print('Solving master problem...')
-        helper.solve_model(opt, master)
-        results_master = helper.get_results(master)
+        opt_helper.solve_model(opt, master)
+        results_master = opt_helper.get_results(master)
 
         # update dual constraint in sub problem
         sub.dual_con1.reconstruct()
@@ -329,10 +329,10 @@ for l2 in l2s:
 
         print('Solving sub problem for all samples...')
         results_sub = {}
-        helper.solve_model(opt, sub)
-        results_sub[0] = helper.get_results(sub, dual=True)
+        opt_helper.solve_model(opt, sub)
+        results_sub[0] = opt_helper.get_results(sub, dual=True)
 
-        converged, upper_bound, lower_bound = helper.convergence_check(
+        converged, upper_bound, lower_bound = opt_helper.convergence_check(
             objective,
             master_prob,
             results_master,
@@ -341,7 +341,7 @@ for l2 in l2s:
             epsilon=epsilon
         )
 
-        helper.print_convergence(converged)
+        opt_helper.print_convergence(converged)
 
         bounds_difference.append(abs(upper_bound - lower_bound))
 
@@ -353,7 +353,7 @@ for l2 in l2s:
     ### Results
     ############################################################################
 
-    helper.print_caption('End Results')
+    opt_helper.print_caption('End Results')
 
     path = '../3_results/'
 
