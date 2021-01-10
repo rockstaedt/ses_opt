@@ -7,19 +7,21 @@ import pandas as pd
 
 import helper
 
+starting_time = tm.time()
+
 ###############################################################################
 ### Model Options
 ###############################################################################
 
 # enables sensitivity analysis regarding the elecitricity price of the real
 # time contract from 15 to 35 in steps of 5
-sensitivity_analysis = True
+sensitivity_analysis = False
 
 # enables the output of csv files, saved into '3_results'
-csv_output = True
+csv_output = False
 
 # sample size for monte carlo simulation
-sample_size = 1000
+sample_size = 10000
 
 # set seed for randomness
 seed = 12
@@ -252,8 +254,9 @@ for l2 in l2s:
     print('Solving sub problem for all samples...')
 
     results_sub = {}
+    counter = 1
     for i, sample in enumerate(SAMPLES):
-        helper.print_status(i)
+        counter = helper.print_status(counter, i)
         # filter for first sample because that is set in the initialization of
         # the model
         if i != 0:
@@ -315,10 +318,11 @@ for l2 in l2s:
 
         print('Solving sub problem for all samples...')
         results_sub = {}
+        counter = 1
         for i, sample in enumerate(SAMPLES):
             # no if statement here because constraint con load is reconstructed
             # with the first sample in samples
-            helper.print_status(i)
+            counter = helper.print_status(counter, i)
             pl = sample
             # update constraint
             sub.con_load.reconstruct()
@@ -406,3 +410,7 @@ if csv_output:
     # save samples as csv
     df_samples = pd.DataFrame(SAMPLES)
     df_samples.to_csv('../3_results/samples.csv', index=False)
+
+
+ending_time = tm.time()
+print(ending_time - starting_time)
