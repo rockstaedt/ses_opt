@@ -4,6 +4,7 @@ import time as tm
 import numpy as np
 import json
 import pandas as pd
+import math
 
 import opt_helper
 
@@ -52,8 +53,11 @@ p_i_max = p_w_max
 # maximum storage level in kWh
 stor_level_max = 5
 
-# charging effiency
-eff_w = 1
+# overall storage efficiency
+eff = 1
+
+# charging efficiency
+eff_w = math.sqrt(eff)
 
 # discharging efficiency
 eff_i = eff_w
@@ -178,7 +182,7 @@ for l2 in l2s:
 
     # minimum uptime constraint
     def min_uptime(master, H):
-        # In order to avoid applying this contraint for hour 0, check for index.
+        # In order to avoid applying this constraint for hour 0, check for index.
         if H != 0:
             # Apply minimum uptime constraint.
             # The end value of the range function needs to be increased to
@@ -201,7 +205,7 @@ for l2 in l2s:
 
     # minimum downtime constraint
     def min_downtime(master, H):
-        # In order to avoid applying this contraint for hour 0, check for index.
+        # In order to avoid applying this constraint for hour 0, check for index.
         if H != 0:
             # Apply minimum downtime constraint.
             # The end value of the range function needs to be increased to
@@ -275,10 +279,10 @@ for l2 in l2s:
     sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
 
     # injection (discharging) status of storage
-    sub.u_stor_i = pyo.Var(sub.H)
+    sub.u_stor_i = pyo.Var(sub.H, within=pyo.Binary)
 
     # withdrawal (charging) status of storage
-    sub.u_stor_w = pyo.Var(sub.H)
+    sub.u_stor_w = pyo.Var(sub.H, within=pyo.Binary)
 
     # power injection of storage
     sub.p_stor_i = pyo.Var(sub.H, within=pyo.NonNegativeReals)
@@ -337,7 +341,7 @@ for l2 in l2s:
     # Storage can only withdraw or inject power in one hour.
     def consistency_storage(sub, H):
         if H != 0:
-            return sub.u_stor_i[H] + sub.u_stor_w[H] == 1
+            return sub.u_stor_i[H] + sub.u_stor_w[H] <= 1
         else:
             return sub.u_stor_i[H] + sub.u_stor_w[H] == 0
     sub.consistency_storage = pyo.Constraint(sub.H, rule=consistency_storage)
@@ -377,14 +381,79 @@ for l2 in l2s:
     # Initialization of sub problem
     #---------------------------------------------------------------------------
 
-    # enable calculation of dual variables in pyomo
-    sub.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+    print('Solving sub problem Binary...')
 
-    print('Solving sub problem...')
-
+    # Solve sub problem with binary status variable for storage but without
+    # calculating the dual variable. This is due to the fact that Pyomo can
+    # not calculate the dual variables if the problem contains binary variables.
     opt_helper.solve_model(opt, sub)
     results_sub = {}
-    results_sub[0] = opt_helper.get_results(sub, dual=True, write=True)
+    results_sub[0] = opt_helper.get_results(sub, dual=False, write=False)
+
+    sub2 = pyo.ConcreteModel()
+
+    sub2.H = pyo.RangeSet(0,24)
+
+    sub2.u = pyo.Var(sub2.H)
+    sub2.p1 = pyo.Var(sub2.H)
+    sub2.pg = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
+    sub2.p2 = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
+    sub2.p_stor_i = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
+    sub2.p_stor_w = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
+    sub2.stor_level = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
+    sub2.u_stor_i = pyo.Var(sub2.H)
+    sub2.u_stor_w = pyo.Var(sub2.H)
+
+    sub2.OBJ = pyo.Objective(
+        expr=sum(c2*sub2.pg[h] +l2*sub2.p2[h] for h in sub2.H)
+    )
+
+    def dual_con1(sub2, H):
+        return sub2.u[H] == results_master['u'][H]
+    sub2.dual_con1 = pyo.Constraint(sub2.H, rule=dual_con1)
+
+    def dual_con2(sub2, H):
+        return sub2.p1[H] == results_master['p1'][H]
+    sub2.dual_con2 = pyo.Constraint(sub2.H, rule=dual_con2)
+
+    # Create constraints to set the variables of the subproblem to the
+    # obtained results
+    def set_u_stor_i(sub2, H):
+        return sub2.u_stor_i[H] == results_sub[0]['u_stor_i'][H]
+    sub2.set_u_stor_i = pyo.Constraint(sub2.H, rule=set_u_stor_i)
+
+    def set_u_stor_w(sub2, H):
+        return sub2.u_stor_w[H] == results_sub[0]['u_stor_w'][H]
+    sub2.set_u_stor_w = pyo.Constraint(sub2.H, rule=set_u_stor_w)
+
+    def set_p_stor_i(sub2, H):
+        return sub2.p_stor_i[H] == results_sub[0]['p_stor_i'][H]
+    sub2.set_p_stor_i = pyo.Constraint(sub2.H, rule=set_p_stor_i)
+
+    def set_p_stor_w(sub2, H):
+        return sub2.p_stor_w[H] == results_sub[0]['p_stor_w'][H]
+    sub2.set_p_stor_w = pyo.Constraint(sub2.H, rule=set_p_stor_w)
+
+    def set_stor_level(sub2, H):
+        return sub2.stor_level[H] == results_sub[0]['stor_level'][H]
+    sub2.set_stor_level = pyo.Constraint(sub2.H, rule=set_stor_level)
+
+    def set_pg(sub2, H):
+        return sub2.pg[H] == results_sub[0]['pg'][H]
+    sub2.set_pg = pyo.Constraint(sub2.H, rule=set_pg)
+
+    def set_p2(sub2, H):
+        return sub2.p2[H] == results_sub[0]['p2'][H]
+    sub2.set_p2 = pyo.Constraint(sub2.H, rule=set_p2)
+
+    # enable calculation of dual variables in pyomo
+    sub2.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+
+    print('Solving sub problem without Binary...')
+
+    opt_helper.solve_model(opt, sub2)
+    results_sub = {}
+    results_sub[0] = opt_helper.get_results(sub2, dual=True, write=False)
 
     # check if upper and lower bound are converging
     converged, upper_bound, lower_bound = opt_helper.convergence_check(
@@ -434,7 +503,21 @@ for l2 in l2s:
         print('Solving sub problem for all samples...')
         results_sub = {}
         opt_helper.solve_model(opt, sub)
-        results_sub[0] = opt_helper.get_results(sub, dual=True, write=True)
+        results_sub[0] = opt_helper.get_results(sub, dual=False, write=False)
+
+        sub2.dual_con1.reconstruct()
+        sub2.dual_con2.reconstruct()
+        sub2.set_u_stor_i.reconstruct()
+        sub2.set_u_stor_w.reconstruct()
+        sub2.set_p_stor_i.reconstruct()
+        sub2.set_p_stor_w.reconstruct()
+        sub2.set_stor_level.reconstruct()
+        sub2.set_pg.reconstruct()
+        sub2.set_p2.reconstruct()
+
+        results_sub = {}
+        opt_helper.solve_model(opt, sub2)
+        results_sub[0] = opt_helper.get_results(sub2, dual=False, write=False)
 
         converged, upper_bound, lower_bound = opt_helper.convergence_check(
             objective,
