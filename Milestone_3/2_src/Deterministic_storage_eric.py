@@ -346,10 +346,6 @@ for l2 in l2s:
             return sub.u_stor_i[H] + sub.u_stor_w[H] == 0
     sub.consistency_storage = pyo.Constraint(sub.H, rule=consistency_storage)
 
-    def test(sub, H):
-        if sub.u_stor_i[H] >= 1:
-            return
-
     # Maximum charging power
     def max_charge(sub, H):
         return sub.p_stor_w[H] <= sub.u_stor_w[H] * p_w_max
@@ -390,70 +386,20 @@ for l2 in l2s:
     results_sub = {}
     results_sub[0] = opt_helper.get_results(sub, dual=False, write=False)
 
-    sub2 = pyo.ConcreteModel()
+    for hour, value in results_sub[0]['u_stor_i'].items():
+        sub.u_stor_i[hour].fix(value)
 
-    sub2.H = pyo.RangeSet(0,24)
-
-    sub2.u = pyo.Var(sub2.H)
-    sub2.p1 = pyo.Var(sub2.H)
-    sub2.pg = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
-    sub2.p2 = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
-    sub2.p_stor_i = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
-    sub2.p_stor_w = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
-    sub2.stor_level = pyo.Var(sub2.H, within=pyo.NonNegativeReals)
-    sub2.u_stor_i = pyo.Var(sub2.H)
-    sub2.u_stor_w = pyo.Var(sub2.H)
-
-    sub2.OBJ = pyo.Objective(
-        expr=sum(c2*sub2.pg[h] +l2*sub2.p2[h] for h in sub2.H)
-    )
-
-    def dual_con1(sub2, H):
-        return sub2.u[H] == results_master['u'][H]
-    sub2.dual_con1 = pyo.Constraint(sub2.H, rule=dual_con1)
-
-    def dual_con2(sub2, H):
-        return sub2.p1[H] == results_master['p1'][H]
-    sub2.dual_con2 = pyo.Constraint(sub2.H, rule=dual_con2)
-
-    # Create constraints to set the variables of the subproblem to the
-    # obtained results
-    def set_u_stor_i(sub2, H):
-        return sub2.u_stor_i[H] == results_sub[0]['u_stor_i'][H]
-    sub2.set_u_stor_i = pyo.Constraint(sub2.H, rule=set_u_stor_i)
-
-    def set_u_stor_w(sub2, H):
-        return sub2.u_stor_w[H] == results_sub[0]['u_stor_w'][H]
-    sub2.set_u_stor_w = pyo.Constraint(sub2.H, rule=set_u_stor_w)
-
-    def set_p_stor_i(sub2, H):
-        return sub2.p_stor_i[H] == results_sub[0]['p_stor_i'][H]
-    sub2.set_p_stor_i = pyo.Constraint(sub2.H, rule=set_p_stor_i)
-
-    def set_p_stor_w(sub2, H):
-        return sub2.p_stor_w[H] == results_sub[0]['p_stor_w'][H]
-    sub2.set_p_stor_w = pyo.Constraint(sub2.H, rule=set_p_stor_w)
-
-    def set_stor_level(sub2, H):
-        return sub2.stor_level[H] == results_sub[0]['stor_level'][H]
-    sub2.set_stor_level = pyo.Constraint(sub2.H, rule=set_stor_level)
-
-    def set_pg(sub2, H):
-        return sub2.pg[H] == results_sub[0]['pg'][H]
-    sub2.set_pg = pyo.Constraint(sub2.H, rule=set_pg)
-
-    def set_p2(sub2, H):
-        return sub2.p2[H] == results_sub[0]['p2'][H]
-    sub2.set_p2 = pyo.Constraint(sub2.H, rule=set_p2)
+    for hour, value in results_sub[0]['u_stor_w'].items():
+        sub.u_stor_w[hour].fix(value)
 
     # enable calculation of dual variables in pyomo
-    sub2.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+    sub.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
 
     print('Solving sub problem without Binary...')
 
-    opt_helper.solve_model(opt, sub2)
+    opt_helper.solve_model(opt, sub)
     results_sub = {}
-    results_sub[0] = opt_helper.get_results(sub2, dual=True, write=False)
+    results_sub[0] = opt_helper.get_results(sub, dual=True, write=False)
 
     # check if upper and lower bound are converging
     converged, upper_bound, lower_bound = opt_helper.convergence_check(
@@ -500,24 +446,21 @@ for l2 in l2s:
         sub.dual_con1.reconstruct()
         sub.dual_con2.reconstruct()
 
-        print('Solving sub problem for all samples...')
+        print('Solving sub problem Binary for all samples...')
         results_sub = {}
         opt_helper.solve_model(opt, sub)
         results_sub[0] = opt_helper.get_results(sub, dual=False, write=False)
 
-        sub2.dual_con1.reconstruct()
-        sub2.dual_con2.reconstruct()
-        sub2.set_u_stor_i.reconstruct()
-        sub2.set_u_stor_w.reconstruct()
-        sub2.set_p_stor_i.reconstruct()
-        sub2.set_p_stor_w.reconstruct()
-        sub2.set_stor_level.reconstruct()
-        sub2.set_pg.reconstruct()
-        sub2.set_p2.reconstruct()
+        for hour, value in results_sub[0]['u_stor_i'].items():
+            sub.u_stor_i[hour].fix(value)
 
+        for hour, value in results_sub[0]['u_stor_w'].items():
+            sub.u_stor_w[hour].fix(value)
+
+        opt_helper.solve_model(opt, sub)
         results_sub = {}
-        opt_helper.solve_model(opt, sub2)
-        results_sub[0] = opt_helper.get_results(sub2, dual=False, write=False)
+        results_sub[0] = opt_helper.get_results(sub, dual=True, write=False)
+
 
         converged, upper_bound, lower_bound = opt_helper.convergence_check(
             objective,
