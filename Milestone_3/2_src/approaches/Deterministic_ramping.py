@@ -31,6 +31,15 @@ c2 = 0.128
 # maximum capacity of generator
 pmax = 12
 
+# minimum uptime of generator
+uptime = 3
+
+# minimum downtime of generator
+downtime = 4
+
+# ramping constraint of generator
+ramping_constraint = 5
+
 # electricity price forward contract in $/kWh
 l1 = 0.25
 
@@ -61,7 +70,7 @@ epsilon = 0.0001
 opt = pyo.SolverFactory('gurobi')
 
 #------------------------------------------------------------------------------
-# opt_helper functions
+# Helper functions
 #------------------------------------------------------------------------------
 
 def objective(u, p1, pg, p2):
@@ -91,14 +100,14 @@ for l2 in l2s:
     # Helper variables
     #---------------------------------------------------------------------------
 
+    # list for the differences of the bounds
+    bounds_difference = []
+
     # list for the objective values
     objective_values = []
 
     # list for lower bound values
     lower_bounds = []
-
-    # list for the differences of the bounds
-    upper_bounds = []
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -113,7 +122,7 @@ for l2 in l2s:
     # **************************************************************************
 
     # hour set
-    master.H = pyo.RangeSet(0, 23)
+    master.H = pyo.RangeSet(0,24)
 
     # **************************************************************************
     # Variables
@@ -121,6 +130,8 @@ for l2 in l2s:
 
     # unit commitment for generator
     master.u = pyo.Var(master.H, within=pyo.Binary)
+
+    #master.u_zero = pyo.Param(mutable=True, )
 
     # electricity purchased with the forward contract
     master.p1 = pyo.Var(master.H, within=pyo.NonNegativeReals)
@@ -146,6 +157,58 @@ for l2 in l2s:
     def alphacon1(master, H):
         return master.alpha[H] >= -500
     master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
+
+    # initialization for forward contract
+    def p1_zero(master):
+        return master.p1[0] == 0
+    master.p1_zero = pyo.Constraint(rule=p1_zero)
+    master.p1_zero.pprint()
+
+    # minimum uptime constraint
+    def min_uptime(master, H):
+        # In order to avoid applying this contraint for hour 0, check for index.
+        if H != 0:
+            # Apply minimum uptime constraint.
+            # The end value of the range function needs to be increased to
+            # be included.
+            V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
+            # For the last hour, the ouput of the range function is 0 because
+            # range(24,24). To include hour 24 into the list, check for length
+            # and put hour 24 into V.
+            if len(V) == 0:
+                V = [H]
+            # Return the sum of all hours in V to apply the constraint for all
+            # hours in V.
+            return sum(
+                master.u[H] - master.u[H-1] for v in V
+                ) <= sum(master.u[v] for v in V)
+        else:
+            # Initialize unit commitment in hour 0.
+            return master.u[H] == 0
+    master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
+
+    # minimum downtime constraint
+    def min_downtime(master, H):
+        # In order to avoid applying this contraint for hour 0, check for index.
+        if H != 0:
+            # Apply minimum downtime constraint.
+            # The end value of the range function needs to be increased to
+            # be included.
+            V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
+            # For the last hour, the ouput of the range function is 0 because
+            # range(24,24). To include hour 24 into the list, check for length
+            # and put hour 24 into V.
+            if len(V) == 0:
+                V = [H]
+            # Return the sum of all hours in V to apply the constraint for all
+            # hours in V.
+            return sum(
+                master.u[H-1] - master.u[H] for v in V
+                ) <= sum(1 - master.u[v] for v in V)
+        else:
+            # Initialize unit commitment in hour 0.
+            return master.u[H] == 0
+    master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
 
     #---------------------------------------------------------------------------
     # Initialization of master problem
@@ -178,8 +241,7 @@ for l2 in l2s:
     # **************************************************************************
 
     # hour set
-    sub.H = pyo.RangeSet(0,23)
-    sub.HS = pyo.RangeSet(0,24) #for storage level
+    sub.H = pyo.RangeSet(0,24)
 
     # **************************************************************************
     # Variables
@@ -200,15 +262,6 @@ for l2 in l2s:
     # electrictiy bought from retailer
     sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
 
-    # storage generation (output)
-    sub.sg = pyo.Var(sub.H, within=pyo.NonNegativeReals)
-
-    # storage level
-    sub.sl = pyo.Var(sub.HS, within=pyo.NonNegativeReals)
-
-    # storage feed-in (input)
-    sub.si = pyo.Var(sub.H, within=pyo.NonNegativeReals)
-
     # **************************************************************************
     # Objective function
     # **************************************************************************
@@ -222,15 +275,26 @@ for l2 in l2s:
     # **************************************************************************
 
     # load must be covered by production or purchasing electrictiy
-    # take first random vector from samples
     def con_load(sub, H):
-        return sub.pg[H] + sub.p1[H] + sub.p2[H] + sub.sg[H] - sub.si[H] >= LOADS[H]
+        return sub.pg[H] + sub.p1[H] + sub.p2[H] >= LOADS[H]
     sub.con_load = pyo.Constraint(sub.H, rule=con_load)
 
     # maximum capacity of generator
     def con_max(sub, H):
         return sub.pg[H] <= pmax*sub.u[H]
     sub.con_max = pyo.Constraint(sub.H, rule=con_max)
+
+    # ramping constraint of generator
+    def con_ramping(sub, H):
+        if H != 0:
+            return (
+                -ramping_constraint,
+                sub.pg[H] - sub.pg[H-1],
+                ramping_constraint
+            )
+        else:
+            return sub.pg[H] == 0
+    sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
 
     # ensure variable u is equal to the solution of the master problem
     def dual_con1(sub, H):
@@ -241,33 +305,6 @@ for l2 in l2s:
     def dual_con2(sub, H):
         return sub.p1[H] == results_master['p1'][H]
     sub.dual_con2 = pyo.Constraint(sub.H, rule=dual_con2)
-
-    # storage constarints #
-
-    # storage level
-    def con_slvl(sub, H):
-        return sub.sl[H+1] == sub.sl[H] - sub.sg[H] +sub.si[H]
-    sub.con_slvl = pyo.Constraint(sub.H, rule=con_slvl)
-
-    # storage feed in max
-    def con_max_input(sub, H):
-        return sub.si[H] <= 10
-    sub.con_max_input = pyo.Constraint(sub.H, rule=con_max_input)
-
-    # storage output max
-    def con_max_output(sub, H):
-        return sub.sg[H] <= 10
-    sub.con_max_output = pyo.Constraint(sub.H, rule=con_max_output)
-
-    # storage level max
-    def con_max_level(sub, H):
-        return sub.sl[H] <= 5
-    sub.con_max_level = pyo.Constraint(sub.H, rule=con_max_level)
-
-    # storage starting condition
-    def con_start(sub):
-        return sub.sl[0] == 5
-    sub.con_start = pyo.Constraint(sub.H, rule=con_start)
 
     #---------------------------------------------------------------------------
     # Initialization of sub problem
@@ -331,6 +368,9 @@ for l2 in l2s:
         results_sub = {}
         opt_helper.solve_model(opt, sub)
         results_sub[0] = opt_helper.get_results(sub, dual=True)
+        print(results_sub[0]['dual_con1'])
+        print('-')
+        print(results_sub[0]['dual_con2'])
 
         converged, upper_bound, lower_bound = opt_helper.convergence_check(
             objective,
@@ -348,7 +388,7 @@ for l2 in l2s:
         objective_values.append(upper_bound)
 
         lower_bounds.append(lower_bound)
-'''
+
     ############################################################################
     ### Results
     ############################################################################
@@ -414,4 +454,3 @@ if csv_output:
         '../3_results/deterministic_computation_times.csv',
         index=False
     )
-'''

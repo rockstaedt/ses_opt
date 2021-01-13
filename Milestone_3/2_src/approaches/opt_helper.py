@@ -45,7 +45,7 @@ def print_status(i:int):
     i += 1
     if i % 100 == 0:
         print(i)
-    else:   
+    else:
         print('.', end='')
 
 
@@ -72,7 +72,7 @@ def get_results(model, dual=False, write=False):
         # loop through all constraints
         for c in model.component_objects(pyo.Constraint, active=True):
             # only dual variables of these constraints are important
-            if str(c) == 'dual_con1' or str(c) == 'dual_con2':
+            if 'dual_con' in str(c):
                 dic2 = {}
                 for index in c:
                     dic2[index] = model.dual[c[index]]
@@ -93,13 +93,15 @@ def convergence_check(objective, master_prob, results_master, results_sub,
             results_sub[i]['u'],
             results_sub[i]['p1'],
             results_sub[i]['pg'],
-            results_sub[i]['p2']
+            results_sub[i]['p2'],
+            results_sub[i]['stor_net_i']
         )
     upper_bound = upper_bound/len(samples)
     lower_bound = master_prob(
         results_master['u'],
         results_master['p1'],
-        results_master['alpha']
+        results_master['alpha'],
+        results_sub[i]['stor_net_i']
     )
     return (
         not abs(upper_bound - lower_bound) > epsilon,
@@ -108,6 +110,13 @@ def convergence_check(objective, master_prob, results_master, results_sub,
     )
 
 def get_loads():
+    """
+    This function returns the 24 load values of the problem. The load vector
+    also contains a initialization value of zero.
+
+    Returns:
+        [list]: 25 load values inluding the initialization value
+    """
     return [
-        8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
+        0,8,8,10,10,16,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10
     ]

@@ -43,46 +43,10 @@ def print_convergence(converged:bool):
 def print_status(i:int):
     # increase by one because index of samples starts with zero
     i += 1
-    if i < 100:
-        print('.', end='')
-    elif i == 100:
+    if i % 100 == 0:
         print(i)
-    elif i < 200:
+    else:
         print('.', end='')
-    elif i == 200:
-        print(i)
-    elif i < 300:
-        print('.', end='')
-    elif i == 300:
-        print(i)
-    elif i < 400:
-        print('.', end='')
-    elif i == 400:
-        print(i)
-    elif i < 500:
-        print('.', end='')
-    elif i == 500:
-        print(i)
-    elif i < 600:
-        print('.', end='')
-    elif i == 600:
-        print(i)
-    elif i < 700:
-        print('.', end='')
-    elif i == 700:
-        print(i)
-    elif i < 800:
-        print('.', end='')
-    elif i == 800:
-        print(i)
-    elif i < 900:
-        print('.', end='')
-    elif i == 900:
-        print(i)
-    elif i < 1000:
-        print('.', end='')
-    elif i == 1000:
-        print(i)
 
 
 def solve_model(solver, model):
@@ -144,13 +108,6 @@ def convergence_check(objective, master_prob, results_master, results_sub,
     )
 
 def get_loads():
-    """
-    This function returns the 24 load values of the problem. The load vector
-    also contains a initialization value of zero.
-
-    Returns:
-        [list]: 25 load values inluding the initialization value
-    """
     return [
-        0, 8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
+        8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
     ]

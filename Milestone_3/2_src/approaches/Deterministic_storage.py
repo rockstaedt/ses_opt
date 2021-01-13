@@ -31,15 +31,6 @@ c2 = 0.128
 # maximum capacity of generator
 pmax = 12
 
-# minimum uptime of generator
-uptime = 3
-
-# minimum downtime of generator
-downtime = 4
-
-# ramping constraint of generator
-ramping_constraint = 5
-
 # electricity price forward contract in $/kWh
 l1 = 0.25
 
@@ -70,7 +61,7 @@ epsilon = 0.0001
 opt = pyo.SolverFactory('gurobi')
 
 #------------------------------------------------------------------------------
-# Helper functions
+# opt_helper functions
 #------------------------------------------------------------------------------
 
 def objective(u, p1, pg, p2):
@@ -100,14 +91,14 @@ for l2 in l2s:
     # Helper variables
     #---------------------------------------------------------------------------
 
-    # list for the differences of the bounds
-    bounds_difference = []
-
     # list for the objective values
     objective_values = []
 
     # list for lower bound values
     lower_bounds = []
+
+    # list for the differences of the bounds
+    upper_bounds = []
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -122,7 +113,7 @@ for l2 in l2s:
     # **************************************************************************
 
     # hour set
-    master.H = pyo.RangeSet(0,24)
+    master.H = pyo.RangeSet(0, 23)
 
     # **************************************************************************
     # Variables
@@ -156,58 +147,6 @@ for l2 in l2s:
         return master.alpha[H] >= -500
     master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
 
-    # initialization for forward contract
-    def p1_zero(master):
-        return master.p1[0] == 0
-    master.p1_zero = pyo.Constraint(rule=p1_zero)
-    master.p1_zero.pprint()
-
-    # minimum uptime constraint
-    def min_uptime(master, H):
-        # In order to avoid applying this contraint for hour 0, check for index.
-        if H != 0:
-            # Apply minimum uptime constraint.
-            # The end value of the range function needs to be increased to
-            # be included.
-            V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0 because
-            # range(24,24). To include hour 24 into the list, check for length
-            # and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint for all
-            # hours in V.
-            return sum(
-                master.u[H] - master.u[H-1] for v in V
-                ) <= sum(master.u[v] for v in V)
-        else:
-            # Initialize unit commitment in hour 0.
-            return master.u[H] == 0
-    master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
-
-    # minimum downtime constraint
-    def min_downtime(master, H):
-        # In order to avoid applying this contraint for hour 0, check for index.
-        if H != 0:
-            # Apply minimum downtime constraint.
-            # The end value of the range function needs to be increased to
-            # be included.
-            V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0 because
-            # range(24,24). To include hour 24 into the list, check for length
-            # and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint for all
-            # hours in V.
-            return sum(
-                master.u[H-1] - master.u[H] for v in V
-                ) <= sum(1 - master.u[v] for v in V)
-        else:
-            # Initialize unit commitment in hour 0.
-            return master.u[H] == 0
-    master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
-
     #---------------------------------------------------------------------------
     # Initialization of master problem
     #---------------------------------------------------------------------------
@@ -239,7 +178,8 @@ for l2 in l2s:
     # **************************************************************************
 
     # hour set
-    sub.H = pyo.RangeSet(0,24)
+    sub.H = pyo.RangeSet(0,23)
+    sub.HS = pyo.RangeSet(0,24) #for storage level
 
     # **************************************************************************
     # Variables
@@ -260,6 +200,15 @@ for l2 in l2s:
     # electrictiy bought from retailer
     sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
 
+    # storage generation (output)
+    sub.sg = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+
+    # storage level
+    sub.sl = pyo.Var(sub.HS, within=pyo.NonNegativeReals)
+
+    # storage feed-in (input)
+    sub.si = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+
     # **************************************************************************
     # Objective function
     # **************************************************************************
@@ -273,26 +222,15 @@ for l2 in l2s:
     # **************************************************************************
 
     # load must be covered by production or purchasing electrictiy
+    # take first random vector from samples
     def con_load(sub, H):
-        return sub.pg[H] + sub.p1[H] + sub.p2[H] >= LOADS[H]
+        return sub.pg[H] + sub.p1[H] + sub.p2[H] + sub.sg[H] - sub.si[H] >= LOADS[H]
     sub.con_load = pyo.Constraint(sub.H, rule=con_load)
 
     # maximum capacity of generator
     def con_max(sub, H):
         return sub.pg[H] <= pmax*sub.u[H]
     sub.con_max = pyo.Constraint(sub.H, rule=con_max)
-
-    # ramping constraint of generator
-    def con_ramping(sub, H):
-        if H != 0:
-            return (
-                -ramping_constraint,
-                sub.pg[H] - sub.pg[H-1],
-                ramping_constraint
-            )
-        else:
-            return sub.pg[H] == 0
-    sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
 
     # ensure variable u is equal to the solution of the master problem
     def dual_con1(sub, H):
@@ -303,6 +241,33 @@ for l2 in l2s:
     def dual_con2(sub, H):
         return sub.p1[H] == results_master['p1'][H]
     sub.dual_con2 = pyo.Constraint(sub.H, rule=dual_con2)
+
+    # storage constarints #
+
+    # storage level
+    def con_slvl(sub, H):
+        return sub.sl[H+1] == sub.sl[H] - sub.sg[H] +sub.si[H]
+    sub.con_slvl = pyo.Constraint(sub.H, rule=con_slvl)
+
+    # storage feed in max
+    def con_max_input(sub, H):
+        return sub.si[H] <= 10
+    sub.con_max_input = pyo.Constraint(sub.H, rule=con_max_input)
+
+    # storage output max
+    def con_max_output(sub, H):
+        return sub.sg[H] <= 10
+    sub.con_max_output = pyo.Constraint(sub.H, rule=con_max_output)
+
+    # storage level max
+    def con_max_level(sub, H):
+        return sub.sl[H] <= 5
+    sub.con_max_level = pyo.Constraint(sub.H, rule=con_max_level)
+
+    # storage starting condition
+    def con_start(sub):
+        return sub.sl[0] == 5
+    sub.con_start = pyo.Constraint(sub.H, rule=con_start)
 
     #---------------------------------------------------------------------------
     # Initialization of sub problem
@@ -329,7 +294,7 @@ for l2 in l2s:
 
     opt_helper.print_convergence(converged)
 
-    bounds_difference.append(abs(upper_bound - lower_bound))
+    #bounds_difference.append(abs(upper_bound - lower_bound))
 
     objective_values.append(upper_bound)
 
@@ -378,74 +343,74 @@ for l2 in l2s:
 
         opt_helper.print_convergence(converged)
 
-        bounds_difference.append(abs(upper_bound - lower_bound))
+        #bounds_difference.append(abs(upper_bound - lower_bound))
 
         objective_values.append(upper_bound)
 
         lower_bounds.append(lower_bound)
 
-    ############################################################################
-    ### Results
-    ############################################################################
+#     ############################################################################
+#     ### Results
+#     ############################################################################
 
-    opt_helper.print_caption('End Results')
+#     opt_helper.print_caption('End Results')
 
-    path = '../3_results/'
+#     path = '../3_results/'
 
-    with open(f'{path}deterministic_results_sub_{l2}.json', 'w') as outfile:
-        json.dump(results_sub[0], outfile)
+#     with open(f'{path}deterministic_results_sub_{l2}.json', 'w') as outfile:
+#         json.dump(results_sub[0], outfile)
 
-    with open(f'{path}deterministic_results_master_{l2}.json', 'w') as outfile:
-        json.dump(results_master, outfile)
+#     with open(f'{path}deterministic_results_master_{l2}.json', 'w') as outfile:
+#         json.dump(results_master, outfile)
 
-    time_end = tm.time()
-    times_dic['l2'].append(str(l2))
-    times_dic['time'].append(time_end - time_start)
-    print('Computation time:')
-    print(f'\t{round(time_end - time_start, 2)}s')
+#     time_end = tm.time()
+#     times_dic['l2'].append(str(l2))
+#     times_dic['time'].append(time_end - time_start)
+#     print('Computation time:')
+#     print(f'\t{round(time_end - time_start, 2)}s')
 
-    ############################################################################
-    ### Exports
-    ############################################################################
+#     ############################################################################
+#     ### Exports
+#     ############################################################################
 
-    if sensitivity_analysis:
-        path += 'sensitivity analysis/deterministic_'
-        prefix = f'_sensitivity_{l2}.csv'
-    else:
-        path = 'deterministic_'
-        prefix = '_no_sensitivity.csv'
+#     if sensitivity_analysis:
+#         path += 'sensitivity analysis/deterministic_'
+#         prefix = f'_sensitivity_{l2}.csv'
+#     else:
+#         path = 'deterministic_'
+#         prefix = '_no_sensitivity.csv'
 
-    if csv_output:
-        # export objective values, difference between bound into
-        # '3_results' as CSV
-        np.array(objective_values).tofile(
-            path + 'objective_values' + prefix,
-            sep = ','
-        )
-        np.array(upper_bound).tofile(
-            path + 'upper_bounds' + prefix,
-            sep = ','
-        )
-        np.array(lower_bound).tofile(
-            path + 'lower_bounds' + prefix,
-            sep = ','
-        )
-        np.array(bounds_difference).tofile(
-            path + 'bounds_differences' + prefix,
-            sep = ','
-        )
+#     if csv_output:
+#         # export objective values, difference between bound into
+#         # '3_results' as CSV
+#         np.array(objective_values).tofile(
+#             path + 'objective_values' + prefix,
+#             sep = ','
+#         )
+#         np.array(upper_bound).tofile(
+#             path + 'upper_bounds' + prefix,
+#             sep = ','
+#         )
+#         np.array(lower_bound).tofile(
+#             path + 'lower_bounds' + prefix,
+#             sep = ','
+#         )
+#         np.array(bounds_difference).tofile(
+#             path + 'bounds_differences' + prefix,
+#             sep = ','
+#         )
 
-if sensitivity_analysis:
-    time_end_sens = tm.time()
-    times_dic['l2'].append('ALL')
-    times_dic['time'].append(time_end_sens - time_start_sens)
-    print('Computation time for sensitivity analysis:')
-    print(f'\t{round(time_end_sens - time_start_sens, 2)}s')
+# if sensitivity_analysis:
+#     time_end_sens = tm.time()
+#     times_dic['l2'].append('ALL')
+#     times_dic['time'].append(time_end_sens - time_start_sens)
+#     print('Computation time for sensitivity analysis:')
+#     print(f'\t{round(time_end_sens - time_start_sens, 2)}s')
 
-if csv_output:
-    # save computation times as csv
-    df_time = pd.DataFrame(times_dic)
-    df_time.to_csv(
-        '../3_results/deterministic_computation_times.csv',
-        index=False
-    )
+# if csv_output:
+#     # save computation times as csv
+#     df_time = pd.DataFrame(times_dic)
+#     df_time.to_csv(
+#         '../3_results/deterministic_computation_times.csv',
+#         index=False
+#     )
