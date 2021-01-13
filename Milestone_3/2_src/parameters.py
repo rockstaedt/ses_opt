@@ -8,6 +8,9 @@ from model_options import deterministic, sensitivity_analysis
 # Size of monte carlo sample
 sample_size = 10
 
+# Size of test sample size
+test_size = 5
+
 # Fixed generator costs in $/h
 c1 = 2.12*10**-5
 

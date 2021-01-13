@@ -28,7 +28,7 @@ current_path = Path.cwd()
 seed = 17
 
 # Get test samples.
-TEST_SAMPLES = get_monte_carlo_samples(LOADS, samples=10, seed=seed)
+TEST_SAMPLES = get_monte_carlo_samples(LOADS, samples=test_size, seed=seed)
 
 # Define a list of approaches.
 APPROACHES = ['stochastic', 'deterministic']
@@ -80,7 +80,7 @@ for approach in APPROACHES:
             + os.path.join(path, f'results_master_{stor_levels_max[0]}.json')
             + ' not found.'
         )
-    print('Solving for all test samples')
+    print(f'Solving for all {test_size} test samples')
 
     for i, sample in enumerate(TEST_SAMPLES):
 
