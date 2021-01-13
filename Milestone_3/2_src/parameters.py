@@ -1,8 +1,5 @@
 from modeling_helper.utilities import *
 
-# Seet for randomness
-seed = 12
-
 # Size of monte carlo sample
 sample_size = 10
 

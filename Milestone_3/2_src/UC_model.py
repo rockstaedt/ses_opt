@@ -42,6 +42,9 @@ esr = False
 ### Parameters
 ###############################################################################
 
+# Seet for randomness
+seed = 12
+
 # For the deterministic approach, the normal load vector with its mean values
 # is used. For the stochastic approach, a monte carlo sample is created.
 if deterministic:
