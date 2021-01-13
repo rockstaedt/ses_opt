@@ -21,7 +21,7 @@ deterministic = False
 
 # This option enables sensitivity analysis regarding the storage capacity from
 # 0 to 20 kWh in steps of 4 kWh
-sensitivity_analysis = False
+sensitivity_analysis = True
 
 # This option enables the output of result files, saved into '3_results'.
 output = True
@@ -510,28 +510,35 @@ for stor_level_max in stor_levels_max:
     # Determine first level saving path
     if deterministic:
         if up_down_time and ramping:
-            path = '../3_results/deterministic/task_2/'
+            path = os.sep.join(['..', '3_results', 'deterministic', 'task_2'])
         elif esr:
-            path = '../3_results/deterministic/task_3/'
+            path = os.sep.join(['..', '3_results', 'deterministic', 'task_3'])
         elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = '../3_results/deterministic/task_4/'
+            path = os.sep.join(['..', '3_results', 'deterministic', 'task_4'])
         else:
-            path = '../3_results/deterministic/task_1/'
+            path = os.sep.join(['..', '3_results', 'deterministic', 'task_1'])
     else:
         if up_down_time and ramping:
-            path = f'../3_results/stochastic/task_2/{sample_size}/'
+            path = os.sep.join(
+                ['..', '3_results', 'stochastic', 'task_2', str(sample_size)]
+            )
         elif esr:
-            path = f'../3_results/stochastic/task_3/{sample_size}/'
+            path = os.sep.join(
+                ['..', '3_results', 'stochastic', 'task_3', str(sample_size)]
+            )
         elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = f'../3_results/stochastic/task_4/{sample_size}/'
+            path = os.sep.join(
+                ['..', '3_results', 'stochastic', 'task_4', str(sample_size)]
+            )
         else:
-            path = f'../3_results/stochastic/task_1/{sample_size}/'
+            path = os.sep.join(
+                ['..', '3_results', 'stochastic', 'task_1', str(sample_size)]
+            )
 
     if sensitivity_analysis:
-        path += 'sensitivity analysis/'
+        path = os.sep.join([path, 'sensitivity analysis'])
         prefix = f'_sensitivity_{stor_level_max}.csv'
     else:
-        path += ''
         prefix = '_no_sensitivity.csv'
 
     # Make sure that folders exist
@@ -544,12 +551,12 @@ for stor_level_max in stor_levels_max:
 
     if output:
         with open(
-            f'{path}results_sub_{stor_level_max}.json',
+            os.sep.join([path, f'results_sub_{stor_level_max}.json']),
             'w') as outfile:
             json.dump(results_sub, outfile)
 
         with open(
-            f'{path}results_master_{stor_level_max}.json',
+            os.sep.join([path, f'results_master_{stor_level_max}.json']),
             'w') as outfile:
             json.dump(results_master, outfile)
 
@@ -560,11 +567,11 @@ for stor_level_max in stor_levels_max:
     if output:
         # Export upper and lower bounds
         np.array(objective_values).tofile(
-            path + 'objective_values' + prefix,
+            os.sep.join([path, 'objective_values' + prefix]),
             sep = ','
         )
         np.array(lower_bounds).tofile(
-            path + 'lower_bounds' + prefix,
+            os.sep.join([path, 'lower_bounds' + prefix]),
             sep = ','
         )
 
@@ -583,5 +590,6 @@ if sensitivity_analysis:
 if output:
     # save computation times as csv
     df_time = pd.DataFrame(times_dic)
-    df_time.to_csv(f'{path}computation_times.csv', index=False)
-
+    df_time.to_csv(
+        os.sep.join([path, f'computation_times.csv']),
+        index=False)
