@@ -5,6 +5,7 @@ import numpy as np
 import json
 import pandas as pd
 import os
+from pathlib import Path
 
 from modeling_helper.utilities import *
 from modeling_helper.printing import *
@@ -471,36 +472,56 @@ for stor_level_max in stor_levels_max:
     print('Computation time:')
     print(f'\t{round(time_end - time_start, 2)}s')
 
+    current_path = Path.cwd()
+
     # Determine first level saving path
     if deterministic:
         if up_down_time and ramping:
-            path = os.sep.join(['..', '3_results', 'deterministic', 'task_2'])
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_2')
         elif esr:
-            path = os.sep.join(['..', '3_results', 'deterministic', 'task_3'])
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_3')
         elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = os.sep.join(['..', '3_results', 'deterministic', 'task_4'])
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_4')
         else:
-            path = os.sep.join(['..', '3_results', 'deterministic', 'task_1'])
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_1')
     else:
         if up_down_time and ramping:
-            path = os.sep.join(
-                ['..', '3_results', 'stochastic', 'task_2', str(sample_size)]
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_2',
+                str(sample_size)
             )
         elif esr:
-            path = os.sep.join(
-                ['..', '3_results', 'stochastic', 'task_3', str(sample_size)]
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic', 'task_3', str(sample_size)
             )
         elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = os.sep.join(
-                ['..', '3_results', 'stochastic', 'task_4', str(sample_size)]
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_4',
+                str(sample_size)
             )
         else:
-            path = os.sep.join(
-                ['..', '3_results', 'stochastic', 'task_1', str(sample_size)]
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_1',
+                str(sample_size)
             )
 
     if sensitivity_analysis:
-        path = os.sep.join([path, 'sensitivity analysis'])
+        path = os.path.join(path, 'sensitivity analysis')
         prefix = f'_sensitivity_{stor_level_max}.csv'
     else:
         prefix = '_no_sensitivity.csv'
@@ -515,12 +536,12 @@ for stor_level_max in stor_levels_max:
 
     if output:
         with open(
-            os.sep.join([path, f'results_sub_{stor_level_max}.json']),
+            os.path.join(path, f'results_sub_{stor_level_max}.json'),
             'w') as outfile:
             json.dump(results_sub, outfile)
 
         with open(
-            os.sep.join([path, f'results_master_{stor_level_max}.json']),
+            os.path.join(path, f'results_master_{stor_level_max}.json'),
             'w') as outfile:
             json.dump(results_master, outfile)
 
@@ -531,11 +552,11 @@ for stor_level_max in stor_levels_max:
     if output:
         # Export upper and lower bounds
         np.array(objective_values).tofile(
-            os.sep.join([path, 'objective_values' + prefix]),
+            os.path.join(path, 'objective_values' + prefix),
             sep = ','
         )
         np.array(lower_bounds).tofile(
-            os.sep.join([path, 'lower_bounds' + prefix]),
+            os.path.join(path, 'lower_bounds' + prefix),
             sep = ','
         )
 
@@ -555,5 +576,5 @@ if output:
     # save computation times as csv
     df_time = pd.DataFrame(times_dic)
     df_time.to_csv(
-        os.sep.join([path, f'computation_times.csv']),
+        os.path.join(path, f'computation_times.csv'),
         index=False)
