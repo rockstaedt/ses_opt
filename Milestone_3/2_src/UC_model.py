@@ -10,6 +10,7 @@ from pathlib import Path
 from modeling_helper.utilities import *
 from modeling_helper.printing import *
 from parameters import *
+from model_options import *
 
 time_start_all = tm.time()
 
