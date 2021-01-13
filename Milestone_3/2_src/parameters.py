@@ -17,6 +17,9 @@ uptime = 3
 
 # Minimum downtime of generator in hours
 downtime = 4
+###############################################################################
+### Paremeters
+###############################################################################
 
 # Ramping constraint of generator in kW
 ramping_constraint = 5
