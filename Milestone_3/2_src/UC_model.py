@@ -502,7 +502,7 @@ for stor_level_max in stor_levels_max:
     ############################################################################
 
     time_end = tm.time()
-    times_dic['stor_level'].append(str(l2))
+    times_dic['stor_level'].append(str(stor_level_max))
     times_dic['time'].append(time_end - time_start)
     print('Computation time:')
     print(f'\t{round(time_end - time_start, 2)}s')
