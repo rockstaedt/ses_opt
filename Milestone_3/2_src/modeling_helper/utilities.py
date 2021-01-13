@@ -96,7 +96,8 @@ def get_loads():
     ]
 
 def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
-                     deterministic:bool, current_path:Path) -> str:
+                     deterministic:bool, sensitivity_analysis:bool,
+                     current_path:Path) -> str:
     """
     Based on the model options, this function returns the corresponding path.
 
@@ -155,4 +156,8 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 'task_1',
                 str(sample_size)
             )
+
+    if sensitivity_analysis:
+        path = os.path.join(path, 'sensitivity analysis')
+
     return path
