@@ -460,13 +460,8 @@ for stor_level_max in stor_levels_max:
         ramping,
         esr,
         deterministic,
+        sensitivity_analysis,
         current_path)
-
-    if sensitivity_analysis:
-        path = os.path.join(path, 'sensitivity analysis')
-        prefix = f'_sensitivity_{stor_level_max}.csv'
-    else:
-        prefix = '_no_sensitivity.csv'
 
     # Make sure that folders exist
     if not os.path.exists(path):
@@ -494,11 +489,11 @@ for stor_level_max in stor_levels_max:
     if output:
         # Export upper and lower bounds
         np.array(objective_values).tofile(
-            os.path.join(path, 'objective_values' + prefix),
+            os.path.join(path, f'objective_values_{stor_level_max}.csv'),
             sep = ','
         )
         np.array(lower_bounds).tofile(
-            os.path.join(path, 'lower_bounds' + prefix),
+            os.path.join(path, f'lower_bounds_{stor_level_max}.csv'),
             sep = ','
         )
 
