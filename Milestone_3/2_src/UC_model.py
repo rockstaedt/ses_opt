@@ -64,6 +64,8 @@ if sensitivity_analysis:
 else:
     stor_levels_max = [4]
 
+# All other parameteres are defined in the file 'parameters.py'
+
 ###############################################################################
 ### L-shape method
 ###############################################################################
