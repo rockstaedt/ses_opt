@@ -1,0 +1,587 @@
+import pyomo.environ as pyo
+from pyomo.opt import SolverFactory
+import time as tm
+import numpy as np
+import json
+import pandas as pd
+import os
+
+from modeling_helper.utilities import *
+from modeling_helper.printing import *
+
+time_start_all = tm.time()
+
+###############################################################################
+### Model Options
+###############################################################################
+
+# This option enables a deterministic approach. If false then the stochastic
+# approch is performed.
+deterministic = False
+
+# This option enables sensitivity analysis regarding the storage capacity from
+# 0 to 20 kWh in steps of 4 kWh
+sensitivity_analysis = False
+
+# This option enables the output of result files, saved into '3_results'.
+output = True
+
+# This option enables the implementation of uptime and downtime constraint of
+# the generator
+up_down_time = True
+
+# This option enables the implementation of the ramping constraint of the
+# generator
+ramping = True
+
+# This option enables the implementation of a energy storage resource.
+esr = False
+
+###############################################################################
+### Parameters
+###############################################################################
+
+# Seet for randomness
+seed = 12
+
+# Size of monte carlo sample
+sample_size = 10
+
+# Fixed generator costs in $/h
+c1 = 2.12*10**-5
+
+# Linear generator costs in $/kWh
+c2 = 0.128
+
+# Maximum capacity of generator
+pmax = 12
+
+# Minimum uptime of generator in hours
+uptime = 3
+
+# Minimum downtime of generator in hours
+downtime = 4
+
+# Ramping constraint of generator in kW
+ramping_constraint = 5
+
+# Electricity price forward contract in $/kWh
+l1 = 0.25
+
+# Electricity price real time contract in $/kWh
+l2 = 0.3
+
+# Maximum charging power of storage in kW
+p_w_max = 10
+
+# Maxium discharging power of storage in kW
+p_i_max = 10
+
+# Load values in kW
+LOADS = get_loads()
+
+# monte carlo samples
+if deterministic:
+    SAMPLES = np.array([LOADS])
+    sample_size = 1
+else:
+    SAMPLES = get_monte_carlo_samples(
+        LOADS,
+        samples=sample_size,
+        seed=seed
+    )
+
+# Hours
+HOURS = list(range(0, len(LOADS)))
+
+# Arbitrary value for convergence check
+epsilon = 0.0001
+
+# Maximum storage level in kWh
+# This parameter is part of a sensitivity analysis. Therefore the parameter is
+# defined as a list.
+if sensitivity_analysis:
+    stor_levels_max = [0, 4, 8, 12, 16, 20]
+else:
+    stor_levels_max = [0.3]
+
+###############################################################################
+### L-shape method
+###############################################################################
+
+# Solver for MIP
+opt = pyo.SolverFactory('gurobi')
+
+#------------------------------------------------------------------------------
+# Helper functions
+#------------------------------------------------------------------------------
+
+def objective(u, p1, pg, p2):
+    """
+    This function calculates the objective value for all hours in hours. This is
+    also the upper bound of the decomposition.
+    """
+    return sum(
+        c1*u[h] + l1*p1[h] + c2*pg[h] + l2*p2[h] for h in HOURS
+    )
+
+def master_prob(u, p1, alpha):
+    """
+    This function calculates the lower bound of the decomposition.
+    """
+    return sum(c1*u[h] + l1*p1[h] + alpha[h] for h in HOURS)
+
+# Dataframe for computation times
+times_dic = {'stor_level': [], 'time': [], 'iterations': []}
+
+# Loop over all storage capacities and solve the L-shape method.
+for stor_level_max in stor_levels_max:
+
+    if deterministic:
+        print_title(
+            f'Solve L-Shape method for {stor_level_max} kWh - Deterministic'
+        )
+    else:
+        print_title(
+            f'Solve L-Shape method for {stor_level_max} kWh - Stochastic'
+        )
+
+    #---------------------------------------------------------------------------
+    # Helper variables
+    #---------------------------------------------------------------------------
+
+    # List of the objective values = upper bound
+    objective_values = []
+
+    # List of lower bound values
+    lower_bounds = []
+
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    # Master problem
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+
+    master = pyo.ConcreteModel()
+
+    # **************************************************************************
+    # Sets
+    # **************************************************************************
+
+    # Hour set
+    master.H = pyo.RangeSet(0, len(HOURS)-1)
+
+    # **************************************************************************
+    # Variables
+    # **************************************************************************
+
+    # Unit commitment for generator
+    master.u = pyo.Var(master.H, within=pyo.Binary)
+
+    # Electricity purchased with the forward contract
+    master.p1 = pyo.Var(master.H, within=pyo.NonNegativeReals)
+
+    # Value function for second stage problem
+    master.alpha = pyo.Var(master.H)
+
+    # **************************************************************************
+    # Objective function
+    # **************************************************************************
+
+    def master_obj(master):
+        return sum(
+            c1*master.u[h] + l1*master.p1[h] + master.alpha[h] for h in master.H
+        )
+    master.OBJ = pyo.Objective(rule=master_obj)
+
+    # **************************************************************************
+    # Constraints
+    # **************************************************************************
+
+    # Alpha down (-500) is an arbitrary selected bound
+    def alphacon1(master, H):
+        return master.alpha[H] >= -500
+    master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
+
+    # Init of forward contract
+    def p1_zero(master):
+        return master.p1[0] == 0
+    master.p1_zero = pyo.Constraint(rule=p1_zero)
+
+    if up_down_time:
+        # Minimum uptime constraint
+        def min_uptime(master, H):
+            # In order to avoid applying this constraint for hour 0,
+            # check for index.
+            if H != 0:
+                # Apply minimum uptime constraint.
+                # The end value of the range function needs to be increased to
+                # be included.
+                V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
+                # For the last hour, the ouput of the range function is 0
+                # because range(24,24). To include hour 24 into the list,
+                # check for length and put hour 24 into V.
+                if len(V) == 0:
+                    V = [H]
+                # Return the sum of all hours in V to apply the constraint for
+                # all hours in V.
+                return sum(
+                    master.u[H] - master.u[H-1] for v in V
+                    ) <= sum(master.u[v] for v in V)
+            else:
+                # Initialize unit commitment in hour 0.
+                return master.u[H] == 0
+        master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
+
+        # Minimum downtime constraint
+        def min_downtime(master, H):
+            # In order to avoid applying this constraint for hour 0, check for
+            # index.
+            if H != 0:
+                # Apply minimum downtime constraint.
+                # The end value of the range function needs to be increased to
+                # be included.
+                V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
+                # For the last hour, the ouput of the range function is 0
+                # because range(24,24). To include hour 24 into the list,
+                # check for length and put hour 24 into V.
+                if len(V) == 0:
+                    V = [H]
+                # Return the sum of all hours in V to apply the constraint for
+                # all hours in V.
+                return sum(
+                    master.u[H-1] - master.u[H] for v in V
+                    ) <= sum(1 - master.u[v] for v in V)
+            else:
+                # Initialize unit commitment in hour 0.
+                return master.u[H] == 0
+        master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
+
+    #---------------------------------------------------------------------------
+    # Initialization of master problem
+    #---------------------------------------------------------------------------
+
+    # Save current time to get the time of calculating
+    time_start = tm.time()
+
+    # Init iteration counter
+    iteration = 0
+
+    print_caption('Initialization')
+
+    print('Solving master problem...')
+
+    solve_model(opt, master)
+
+    results_master = get_results(master)
+
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    # Sub problem
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+
+    sub = pyo.ConcreteModel()
+
+    # **************************************************************************
+    # Sets
+    # **************************************************************************
+
+    # hour set
+    sub.H = pyo.RangeSet(0, len(HOURS)-1)
+
+    # **************************************************************************
+    # Variables
+    # **************************************************************************
+
+    # First stage variables
+
+    # no need for declaration of variable types because that is determined by
+    # corresponding variables of master problem
+    sub.u = pyo.Var(sub.H)
+    sub.p1 = pyo.Var(sub.H)
+
+    # Second stage variables
+
+    # electricity produced by generator
+    sub.pg = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+
+    # electrictiy bought from retailer
+    sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+
+    if esr:
+        # Net injection by storage with bounds of maximum charge and discharge.
+        sub.stor_net_i = pyo.Var(sub.H)
+
+        # Storage level
+        sub.stor_level = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+
+
+    # **************************************************************************
+    # Objective function
+    # **************************************************************************
+
+    sub.OBJ = pyo.Objective(
+        expr=sum(c2*sub.pg[h] +l2*sub.p2[h] for h in sub.H)
+    )
+
+    # **************************************************************************
+    # Constraints
+    # **************************************************************************
+
+    # Take first random vector from samples
+    pl = SAMPLES[0, :]
+    if esr:
+        # Load must be covered by production, purchasing electrictiy or by net
+        # injection of storage system.
+        def con_load(sub, H):
+            return (sub.pg[H] + sub.p1[H] + sub.p2[H]
+                + sub.stor_net_i[H]) >= pl[H]
+        sub.con_load = pyo.Constraint(sub.H, rule=con_load)
+    else:
+        # Load must be covered by production or purchasing electrictiy.
+        def con_load(sub, H):
+            return sub.pg[H] + sub.p1[H] + sub.p2[H] >= pl[H]
+        sub.con_load = pyo.Constraint(sub.H, rule=con_load)
+
+    # maximum capacity of generator
+    def con_max(sub, H):
+        return sub.pg[H] <= pmax*sub.u[H]
+    sub.con_max = pyo.Constraint(sub.H, rule=con_max)
+
+    # ensure variable u is equal to the solution of the master problem
+    def dual_con1(sub, H):
+        return sub.u[H] == results_master['u'][H]
+    sub.dual_con1 = pyo.Constraint(sub.H, rule=dual_con1)
+
+    # ensure variable p1 is equal to the solution of the master problem
+    def dual_con2(sub, H):
+        return sub.p1[H] == results_master['p1'][H]
+    sub.dual_con2 = pyo.Constraint(sub.H, rule=dual_con2)
+
+    if ramping:
+        # Ramping constraint of generator
+        def con_ramping(sub, H):
+            if H != 0:
+                return (
+                    -ramping_constraint,
+                    sub.pg[H] - sub.pg[H-1],
+                    ramping_constraint
+                )
+            else:
+                return sub.pg[H] == 0
+        sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
+
+    if esr:
+        # Constraint for net injection by storage
+        def max_net_i(sub, H):
+            if H != 0:
+                return (-p_w_max, sub.stor_net_i[H], p_i_max)
+            else:
+                return sub.stor_net_i[H] == 0
+        sub.max_net_i = pyo.Constraint(sub.H, rule=max_net_i)
+
+        # Maximum Storage Level
+        def max_storage(sub, H):
+            return sub.stor_level[H] <= stor_level_max
+        sub.max_storage = pyo.Constraint(sub.H, rule=max_storage)
+
+        # Storage Balance
+        def stor_balance(sub, H):
+            if H != 0:
+                return sub.stor_level[H] == (
+                    sub.stor_level[H-1] - sub.stor_net_i[H]
+                )
+            else:
+                return sub.stor_level[H] == 0
+        sub.stor_balance = pyo.Constraint(sub.H, rule=stor_balance)
+
+    #---------------------------------------------------------------------------
+    # Initialization of sub problem
+    #---------------------------------------------------------------------------
+
+    # enable calculation of dual variables in pyomo
+    sub.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+
+    print(f'Solving sub problem for samples size = {sample_size}')
+
+    results_sub = {}
+    for i, sample in enumerate(SAMPLES):
+        print_status(i)
+        # Filter for first sample because that is set in the initialization of
+        # the model.
+        if i != 0:
+            # get new load sample
+            pl = sample
+            # update constraint
+            sub.con_load.reconstruct()
+        # solve model
+        solve_model(opt, sub)
+        results_sub[i] = get_results(sub, dual=True)
+
+    # check if upper and lower bound are converging
+    converged, upper_bound, lower_bound = convergence_check(
+        objective,
+        master_prob,
+        results_master,
+        results_sub,
+        samples=SAMPLES,
+        epsilon=epsilon
+    )
+
+    print_convergence(converged)
+
+    objective_values.append(upper_bound)
+
+    lower_bounds.append(lower_bound)
+
+    # Optimize until upper and lower bound are converging
+    while not converged:
+        iteration += 1
+
+        print_caption(f'Iteration {iteration}')
+
+        def cut(master, H):
+            return (
+                sum(
+                    c2*results_sub[i]['pg'][H] + l2*results_sub[i]['p2'][H]
+                    + results_sub[i]['dual_con1'][H]*(
+                        master.u[H] - results_master['u'][H])
+                    + results_sub[i]['dual_con2'][H]*(
+                        master.p1[H] - results_master['p1'][H])
+                    for i, sample in enumerate(SAMPLES)
+                )/sample_size
+                <= master.alpha[H]
+            )
+
+        setattr(master, f'cut_{iteration}', pyo.Constraint(master.H, rule=cut))
+        print(f'Added cut_{iteration}')
+
+        print('Solving master problem...')
+        solve_model(opt, master)
+        results_master = get_results(master)
+
+        # update dual constraint in sub problem
+        sub.dual_con1.reconstruct()
+        sub.dual_con2.reconstruct()
+
+        print(f'Solving sub problem for samples size = {sample_size}')
+        results_sub = {}
+        for i, sample in enumerate(SAMPLES):
+            # no if statement here because constraint con load is reconstructed
+            # with the first sample in samples
+            print_status(i)
+            pl = sample
+            # update constraint
+            sub.con_load.reconstruct()
+            # solve model
+            solve_model(opt, sub)
+            results_sub[i] = get_results(sub, dual=True)
+
+        converged, upper_bound, lower_bound = convergence_check(
+            objective,
+            master_prob,
+            results_master,
+            results_sub,
+            samples=SAMPLES,
+            epsilon=epsilon
+        )
+
+        print_convergence(converged)
+
+        objective_values.append(upper_bound)
+
+        lower_bounds.append(lower_bound)
+
+    print_caption('End')
+
+    times_dic['iterations'].append(iteration)
+
+    ############################################################################
+    ### Results & Exports
+    ############################################################################
+
+    time_end = tm.time()
+    times_dic['stor_level'].append(str(l2))
+    times_dic['time'].append(time_end - time_start)
+    print('Computation time:')
+    print(f'\t{round(time_end - time_start, 2)}s')
+
+    # Determine first level saving path
+    if deterministic:
+        if up_down_time and ramping:
+            path = '../3_results/deterministic/task_2/'
+        elif esr:
+            path = '../3_results/deterministic/task_3/'
+        elif up_down_time and ramping and esr and sensitivity_analysis:
+            path = '../3_results/deterministic/task_4/'
+        else:
+            path = '../3_results/deterministic/task_1/'
+    else:
+        if up_down_time and ramping:
+            path = f'../3_results/stochastic/task_2/{sample_size}/'
+        elif esr:
+            path = f'../3_results/stochastic/task_3/{sample_size}/'
+        elif up_down_time and ramping and esr and sensitivity_analysis:
+            path = f'../3_results/stochastic/task_4/{sample_size}/'
+        else:
+            path = f'../3_results/stochastic/task_1/{sample_size}/'
+
+    if sensitivity_analysis:
+        path += 'sensitivity analysis/'
+        prefix = f'_sensitivity_{stor_level_max}.csv'
+    else:
+        path += ''
+        prefix = '_no_sensitivity.csv'
+
+    # Make sure that folders exist
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    #---------------------------------------------------------------------------
+    # Model results
+    #---------------------------------------------------------------------------
+
+    if output:
+        with open(
+            f'{path}results_sub_{stor_level_max}.json',
+            'w') as outfile:
+            json.dump(results_sub, outfile)
+
+        with open(
+            f'{path}results_master_{stor_level_max}.json',
+            'w') as outfile:
+            json.dump(results_master, outfile)
+
+    #---------------------------------------------------------------------------
+    # Upper and lower bound
+    #---------------------------------------------------------------------------
+
+    if output:
+        # Export upper and lower bounds
+        np.array(objective_values).tofile(
+            path + 'objective_values' + prefix,
+            sep = ','
+        )
+        np.array(lower_bounds).tofile(
+            path + 'lower_bounds' + prefix,
+            sep = ','
+        )
+
+#---------------------------------------------------------------------------
+    # Computation time
+#---------------------------------------------------------------------------
+
+time_end_all = tm.time()
+times_dic['stor_level'].append('TOTAL')
+times_dic['time'].append(time_end_all - time_start_all)
+times_dic['iterations'].append(0)
+if sensitivity_analysis:
+    print('Computation time for sensitivity analysis:')
+    print(f'\t{round(time_end_all - time_start_all, 2)}s')
+
+if output:
+    # save computation times as csv
+    df_time = pd.DataFrame(times_dic)
+    df_time.to_csv(f'{path}computation_times.csv', index=False)
+
