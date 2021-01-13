@@ -3,6 +3,7 @@
 ###############################################################################
 
 from modeling_helper.utilities import *
+from model_options import deterministic, sensitivity_analysis
 
 # Size of monte carlo sample
 sample_size = 10
@@ -45,3 +46,13 @@ HOURS = list(range(0, len(LOADS)))
 
 # Arbitrary value for convergence check
 epsilon = 0.0001
+
+# Maximum storage level in kWh
+# This parameter is part of a sensitivity analysis from 0 kWh to 20 kWh in steps
+# of 4. Therefore the parameter is defined as a list in case of a sensitivity
+# analysis. If no sensitivity analysis is performed, the intial value of 4 kWh
+# is used.
+if sensitivity_analysis:
+    stor_levels_max = [0, 4, 8, 12, 16, 20]
+else:
+    stor_levels_max = [4]
