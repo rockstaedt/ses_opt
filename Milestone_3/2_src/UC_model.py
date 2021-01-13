@@ -17,27 +17,7 @@ time_start_all = tm.time()
 ### Model Options
 ###############################################################################
 
-# This option enables a deterministic approach. If false then the stochastic
-# approch is performed.
-deterministic = True
-
-# This option enables sensitivity analysis regarding the storage capacity from
-# 0 to 20 kWh in steps of 4 kWh
-sensitivity_analysis = False
-
-# This option enables the output of result files, saved into '3_results'.
-output = True
-
-# This option enables the implementation of uptime and downtime constraint of
-# the generator
-up_down_time = True
-
-# This option enables the implementation of the ramping constraint of the
-# generator
-ramping = True
-
-# This option enables the implementation of a energy storage resource.
-esr = False
+# The model options are defined in the file 'model_options.py'
 
 ###############################################################################
 ### Parameters
@@ -474,51 +454,12 @@ for stor_level_max in stor_levels_max:
 
     current_path = Path.cwd()
 
-    # Determine first level saving path
-    if deterministic:
-        if up_down_time and ramping:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_2')
-        elif esr:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_3')
-        elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_4')
-        else:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_1')
-    else:
-        if up_down_time and ramping:
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_2',
-                str(sample_size)
-            )
-        elif esr:
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic', 'task_3', str(sample_size)
-            )
-        elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_4',
-                str(sample_size)
-            )
-        else:
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_1',
-                str(sample_size)
-            )
+    path = get_path_by_task(
+        up_down_time,
+        ramping,
+        esr,
+        deterministic,
+        current_path)
 
     if sensitivity_analysis:
         path = os.path.join(path, 'sensitivity analysis')
