@@ -1,6 +1,8 @@
 import pyomo.environ as pyo
 from pyomo.core import Var, value
 import numpy as np
+import os
+from pathlib import Path
 
 def get_monte_carlo_samples(values:list, samples=1000, seed=12):
     """
@@ -92,3 +94,65 @@ def get_loads():
     return [
         0,8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
     ]
+
+def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
+                     deterministic:bool, current_path:Path) -> str:
+    """
+    Based on the model options, this function returns the corresponding path.
+
+    Args:
+        up_down_time (bool):
+        ramping (bool):
+        esr (bool):
+        deterministic (bool):
+        current_path (Path):
+
+    Returns:
+        str: path to result folder of model
+    """
+        # Determine first level saving path
+    if deterministic:
+        if up_down_time and ramping:
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_2')
+        elif esr:
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_3')
+        elif up_down_time and ramping and esr and sensitivity_analysis:
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_4')
+        else:
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_1')
+    else:
+        if up_down_time and ramping:
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_2',
+                str(sample_size)
+            )
+        elif esr:
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic', 'task_3', str(sample_size)
+            )
+        elif up_down_time and ramping and esr and sensitivity_analysis:
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_4',
+                str(sample_size)
+            )
+        else:
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_1',
+                str(sample_size)
+            )
+    return path
