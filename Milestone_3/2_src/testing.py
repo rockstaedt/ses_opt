@@ -76,10 +76,11 @@ for approach in APPROACHES:
             parameter = json.load(f)
     except:
         print(
-            'File '
+            'Attention! File '
             + os.path.join(path, f'results_master_{stor_levels_max[0]}.json')
             + ' not found.'
         )
+        break
     print(f'Solving for all {test_size} test samples')
 
     for i, sample in enumerate(TEST_SAMPLES):
