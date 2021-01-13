@@ -8,6 +8,7 @@ import os
 
 from modeling_helper.utilities import *
 from modeling_helper.printing import *
+from parameters import *
 
 time_start_all = tm.time()
 
@@ -17,11 +18,11 @@ time_start_all = tm.time()
 
 # This option enables a deterministic approach. If false then the stochastic
 # approch is performed.
-deterministic = False
+deterministic = True
 
 # This option enables sensitivity analysis regarding the storage capacity from
 # 0 to 20 kWh in steps of 4 kWh
-sensitivity_analysis = True
+sensitivity_analysis = False
 
 # This option enables the output of result files, saved into '3_results'.
 output = True
@@ -41,46 +42,8 @@ esr = False
 ### Parameters
 ###############################################################################
 
-# Seet for randomness
-seed = 12
-
-# Size of monte carlo sample
-sample_size = 10
-
-# Fixed generator costs in $/h
-c1 = 2.12*10**-5
-
-# Linear generator costs in $/kWh
-c2 = 0.128
-
-# Maximum capacity of generator
-pmax = 12
-
-# Minimum uptime of generator in hours
-uptime = 3
-
-# Minimum downtime of generator in hours
-downtime = 4
-
-# Ramping constraint of generator in kW
-ramping_constraint = 5
-
-# Electricity price forward contract in $/kWh
-l1 = 0.25
-
-# Electricity price real time contract in $/kWh
-l2 = 0.3
-
-# Maximum charging power of storage in kW
-p_w_max = 10
-
-# Maxium discharging power of storage in kW
-p_i_max = 10
-
-# Load values in kW
-LOADS = get_loads()
-
-# monte carlo samples
+# For the deterministic approach, the normal load vector with its mean values
+# is used. For the stochastic approach, a monte carlo sample is created.
 if deterministic:
     SAMPLES = np.array([LOADS])
     sample_size = 1
@@ -91,19 +54,15 @@ else:
         seed=seed
     )
 
-# Hours
-HOURS = list(range(0, len(LOADS)))
-
-# Arbitrary value for convergence check
-epsilon = 0.0001
-
 # Maximum storage level in kWh
-# This parameter is part of a sensitivity analysis. Therefore the parameter is
-# defined as a list.
+# This parameter is part of a sensitivity analysis from 0 kWh to 20 kWh in steps
+# of 4. Therefore the parameter is defined as a list in case of a sensitivity
+# analysis. If no sensitivity analysis is performed, the intial value of 4 kWh
+# is used.
 if sensitivity_analysis:
     stor_levels_max = [0, 4, 8, 12, 16, 20]
 else:
-    stor_levels_max = [0.3]
+    stor_levels_max = [4]
 
 ###############################################################################
 ### L-shape method
