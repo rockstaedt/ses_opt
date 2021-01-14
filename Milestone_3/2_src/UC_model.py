@@ -463,10 +463,10 @@ for stor_level_max in stor_levels_max:
     #---------------------------------------------------------------------------
 
     if output:
-        with open(
-            os.path.join(path, f'results_sub_{stor_level_max}.json'),
-            'w') as outfile:
-            json.dump(results_sub, outfile)
+        # with open(
+        #     os.path.join(path, f'results_sub_{stor_level_max}.json'),
+        #     'w') as outfile:
+        #     json.dump(results_sub, outfile)
 
         with open(
             os.path.join(path, f'results_master_{stor_level_max}.json'),
