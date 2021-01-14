@@ -104,12 +104,16 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
     Returns:
         str: path to result folder of model
     """
-        # Determine first level saving path
+    # Determine first level saving path
     if deterministic:
-        if up_down_time and ramping:
+        if (not up_down_time and not ramping and not esr
+            and not sensitivity_analysis):
+            path = os.path.join(
+                current_path.parent, '3_results', 'deterministic', 'task_1')
+        elif up_down_time and ramping and not esr and not sensitivity_analysis:
             path = os.path.join(
                 current_path.parent, '3_results', 'deterministic', 'task_2')
-        elif esr:
+        elif up_down_time and ramping and esr and not sensitivity_analysis:
             path = os.path.join(
                 current_path.parent, '3_results', 'deterministic', 'task_3')
         elif up_down_time and ramping and esr and sensitivity_analysis:
@@ -117,9 +121,18 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 current_path.parent, '3_results', 'deterministic', 'task_4')
         else:
             path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_1')
+                current_path.parent, '3_results', 'deterministic', 'no_task')
     else:
-        if up_down_time and ramping:
+        if (not up_down_time and not ramping and not esr
+            and not sensitivity_analysis):
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_1',
+                str(sample_size)
+            )
+        elif up_down_time and ramping and not esr and not sensitivity_analysis:
             path = os.path.join(
                 current_path.parent,
                 '3_results',
@@ -127,7 +140,7 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 'task_2',
                 str(sample_size)
             )
-        elif esr:
+        elif up_down_time and ramping and esr and not sensitivity_analysis:
             path = os.path.join(
                 current_path.parent,
                 '3_results',
@@ -148,7 +161,7 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 current_path.parent,
                 '3_results',
                 'stochastic',
-                'task_1',
+                'no_task',
                 str(sample_size)
             )
 
