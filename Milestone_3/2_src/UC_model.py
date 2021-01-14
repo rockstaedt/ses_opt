@@ -463,11 +463,12 @@ for stor_level_max in stor_levels_max:
     #---------------------------------------------------------------------------
 
     if output:
-        # Save only the sub results of the last iteration.
+        # Save only the sub results of the last iteration and last sample.
         with open(
             os.path.join(path, f'results_sub_{stor_level_max}.json'),
             'w') as outfile:
-            json.dump(results_sub[iteration], outfile)
+            last_key = list(results_sub.keys())[-1]
+            json.dump(results_sub[last_key], outfile)
 
         with open(
             os.path.join(path, f'results_master_{stor_level_max}.json'),
