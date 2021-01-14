@@ -104,21 +104,31 @@ for stor_level_max in stor_levels_max:
     # Sets
     # **************************************************************************
 
-    # Hour set
-    master.H = pyo.RangeSet(0, len(HOURS)-1)
+    # Hour sets
+    master.H = pyo.RangeSet(1, len(HOURS)-1)
+    master.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
     # **************************************************************************
     # Variables
     # **************************************************************************
 
     # Unit commitment for generator
-    master.u = pyo.Var(master.H, within=pyo.Binary)
+    master.u = pyo.Var(master.H_all, within=pyo.Binary)
+
+    # Initialization for u
+    master.u[0].fix(0)
 
     # Electricity purchased with the forward contract
-    master.p1 = pyo.Var(master.H, within=pyo.NonNegativeReals)
+    master.p1 = pyo.Var(master.H_all, within=pyo.NonNegativeReals)
+
+    # Initialization for p1
+    master.p1[0].fix(0)
 
     # Value function for second stage problem
-    master.alpha = pyo.Var(master.H)
+    master.alpha = pyo.Var(master.H_all)
+
+    # Initialization for p1
+    master.alpha[0].fix(0)
 
     # **************************************************************************
     # Objective function
@@ -139,58 +149,41 @@ for stor_level_max in stor_levels_max:
         return master.alpha[H] >= -500
     master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
 
-    # Init of forward contract
-    def p1_zero(master):
-        return master.p1[0] == 0
-    master.p1_zero = pyo.Constraint(rule=p1_zero)
-
     if up_down_time:
         # Minimum uptime constraint
         def min_uptime(master, H):
-            # In order to avoid applying this constraint for hour 0,
-            # check for index.
-            if H != 0:
-                # Apply minimum uptime constraint.
-                # The end value of the range function needs to be increased to
-                # be included.
-                V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
-                # For the last hour, the ouput of the range function is 0
-                # because range(24,24). To include hour 24 into the list,
-                # check for length and put hour 24 into V.
-                if len(V) == 0:
-                    V = [H]
-                # Return the sum of all hours in V to apply the constraint for
-                # all hours in V.
-                return sum(
-                    master.u[H] - master.u[H-1] for v in V
-                    ) <= sum(master.u[v] for v in V)
-            else:
-                # Initialize unit commitment in hour 0.
-                return master.u[H] == 0
+            # Apply minimum uptime constraint.
+            # The end value of the range function needs to be increased to
+            # be included.
+            V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
+            # For the last hour, the ouput of the range function is 0
+            # because range(24,24). To include hour 24 into the list,
+            # check for length and put hour 24 into V.
+            if len(V) == 0:
+                V = [H]
+            # Return the sum of all hours in V to apply the constraint for
+            # all hours in V.
+            return sum(
+                master.u[H] - master.u[H-1] for v in V
+                ) <= sum(master.u[v] for v in V)
         master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
 
         # Minimum downtime constraint
         def min_downtime(master, H):
-            # In order to avoid applying this constraint for hour 0, check for
-            # index.
-            if H != 0:
-                # Apply minimum downtime constraint.
-                # The end value of the range function needs to be increased to
-                # be included.
-                V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
-                # For the last hour, the ouput of the range function is 0
-                # because range(24,24). To include hour 24 into the list,
-                # check for length and put hour 24 into V.
-                if len(V) == 0:
-                    V = [H]
-                # Return the sum of all hours in V to apply the constraint for
-                # all hours in V.
-                return sum(
-                    master.u[H-1] - master.u[H] for v in V
-                    ) <= sum(1 - master.u[v] for v in V)
-            else:
-                # Initialize unit commitment in hour 0.
-                return master.u[H] == 0
+            # Apply minimum downtime constraint.
+            # The end value of the range function needs to be increased to
+            # be included.
+            V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
+            # For the last hour, the ouput of the range function is 0
+            # because range(24,24). To include hour 24 into the list,
+            # check for length and put hour 24 into V.
+            if len(V) == 0:
+                V = [H]
+            # Return the sum of all hours in V to apply the constraint for
+            # all hours in V.
+            return sum(
+                master.u[H-1] - master.u[H] for v in V
+                ) <= sum(1 - master.u[v] for v in V)
         master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
 
     #---------------------------------------------------------------------------
@@ -223,8 +216,9 @@ for stor_level_max in stor_levels_max:
     # Sets
     # **************************************************************************
 
-    # hour set
-    sub.H = pyo.RangeSet(0, len(HOURS)-1)
+    # Hour sets
+    sub.H = pyo.RangeSet(1, len(HOURS)-1)
+    sub.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
     # **************************************************************************
     # Variables
@@ -234,23 +228,35 @@ for stor_level_max in stor_levels_max:
 
     # no need for declaration of variable types because that is determined by
     # corresponding variables of master problem
-    sub.u = pyo.Var(sub.H)
-    sub.p1 = pyo.Var(sub.H)
+    sub.u = pyo.Var(sub.H_all)
+    sub.p1 = pyo.Var(sub.H_all)
 
     # Second stage variables
 
-    # electricity produced by generator
-    sub.pg = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+    # Electricity produced by generator
+    sub.pg = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
 
-    # electrictiy bought from retailer
-    sub.p2 = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+    # Initialization of pg
+    sub.pg[0].fix(0)
+
+    # Electrictiy bought from retailer
+    sub.p2 = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
+
+    # Initialization of pg
+    sub.p2[0].fix(0)
 
     if esr:
         # Net injection by storage with bounds of maximum charge and discharge.
-        sub.stor_net_i = pyo.Var(sub.H)
+        sub.stor_net_i = pyo.Var(sub.H_all)
+
+        # Initialization of storage net injection
+        sub.stor_net_i[0].fix(0)
 
         # Storage level
-        sub.stor_level = pyo.Var(sub.H, within=pyo.NonNegativeReals)
+        sub.stor_level = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
+
+        # Initialization of storage level
+        sub.stor_level[0].fix(0)
 
 
     # **************************************************************************
@@ -288,33 +294,25 @@ for stor_level_max in stor_levels_max:
     # ensure variable u is equal to the solution of the master problem
     def dual_con1(sub, H):
         return sub.u[H] == results_master['u'][H]
-    sub.dual_con1 = pyo.Constraint(sub.H, rule=dual_con1)
+    sub.dual_con1 = pyo.Constraint(sub.H_all, rule=dual_con1)
 
     # ensure variable p1 is equal to the solution of the master problem
     def dual_con2(sub, H):
         return sub.p1[H] == results_master['p1'][H]
-    sub.dual_con2 = pyo.Constraint(sub.H, rule=dual_con2)
+    sub.dual_con2 = pyo.Constraint(sub.H_all, rule=dual_con2)
 
     if ramping:
         # Ramping constraint of generator
         def con_ramping(sub, H):
-            if H != 0:
-                return (
-                    -ramping_constraint,
-                    sub.pg[H] - sub.pg[H-1],
-                    ramping_constraint
-                )
-            else:
-                return sub.pg[H] == 0
+            return (
+                -ramping_constraint, sub.pg[H] - sub.pg[H-1], ramping_constraint
+            )
         sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
 
     if esr:
         # Constraint for net injection by storage
         def max_net_i(sub, H):
-            if H != 0:
-                return (-p_w_max, sub.stor_net_i[H], p_i_max)
-            else:
-                return sub.stor_net_i[H] == 0
+            return (-p_w_max, sub.stor_net_i[H], p_i_max)
         sub.max_net_i = pyo.Constraint(sub.H, rule=max_net_i)
 
         # Maximum Storage Level
@@ -324,12 +322,7 @@ for stor_level_max in stor_levels_max:
 
         # Storage Balance
         def stor_balance(sub, H):
-            if H != 0:
-                return sub.stor_level[H] == (
-                    sub.stor_level[H-1] - sub.stor_net_i[H]
-                )
-            else:
-                return sub.stor_level[H] == 0
+            return sub.stor_level[H] == sub.stor_level[H-1] - sub.stor_net_i[H]
         sub.stor_balance = pyo.Constraint(sub.H, rule=stor_balance)
 
     #---------------------------------------------------------------------------
