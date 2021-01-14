@@ -78,7 +78,7 @@ def convergence_check(objective, master_prob, results_master, results_sub,
         results_master['alpha']
     )
     return (
-        not abs(upper_bound - lower_bound) > epsilon,
+        not upper_bound - lower_bound > epsilon,
         upper_bound,
         lower_bound
     )
