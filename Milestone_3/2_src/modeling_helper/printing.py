@@ -41,17 +41,16 @@ def print_convergence(converged:bool):
         print('--> Converged. Stop algorithm.')
         print()
 
-def print_status(i:int):
+def print_status(i:int, sample_size:int):
     """
-    This function prints a dot to the terminal to illustrate the ongoing
-    iteration.
+    This function prints the number of calculated samples to illustrate
+    the ongoing iteration. Hereby, the iteration when the status is printed is
+    based on the sample size.
 
     Args:
         i (int): counter of iteration
     """
     # increase by one because index of samples starts with zero
     i += 1
-    if i % 100 == 0:
-        print(i)
-    else:
-        print('.', end='')
+    if i % (sample_size/10) == 0:
+        print(f'\t{i} done')

@@ -336,7 +336,7 @@ for stor_level_max in stor_levels_max:
 
     results_sub = {}
     for i, sample in enumerate(SAMPLES):
-        print_status(i)
+        print_status(i, sample_size)
         # Filter for first sample because that is set in the initialization of
         # the model.
         if i != 0:
@@ -399,7 +399,7 @@ for stor_level_max in stor_levels_max:
         for i, sample in enumerate(SAMPLES):
             # no if statement here because constraint con load is reconstructed
             # with the first sample in samples
-            print_status(i)
+            print_status(i, sample_size)
             pl = sample
             # update constraint
             sub.con_load.reconstruct()
