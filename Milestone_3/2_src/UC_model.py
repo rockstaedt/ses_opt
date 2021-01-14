@@ -247,13 +247,17 @@ for stor_level_max in stor_levels_max:
 
     if esr:
         # Net injection by storage with bounds of maximum charge and discharge.
-        sub.stor_net_i = pyo.Var(sub.H_all)
+        sub.stor_net_i = pyo.Var(sub.H_all,  bounds=(-p_w_max, p_i_max))
 
         # Initialization of storage net injection
         sub.stor_net_i[0].fix(0)
 
         # Storage level
-        sub.stor_level = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
+        sub.stor_level = pyo.Var(
+            sub.H_all,
+            within=pyo.NonNegativeReals,
+            bounds=(0, stor_level_max)
+        )
 
         # Initialization of storage level
         sub.stor_level[0].fix(0)
@@ -310,16 +314,6 @@ for stor_level_max in stor_levels_max:
         sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
 
     if esr:
-        # Constraint for net injection by storage
-        def max_net_i(sub, H):
-            return (-p_w_max, sub.stor_net_i[H], p_i_max)
-        sub.max_net_i = pyo.Constraint(sub.H, rule=max_net_i)
-
-        # Maximum Storage Level
-        def max_storage(sub, H):
-            return sub.stor_level[H] <= stor_level_max
-        sub.max_storage = pyo.Constraint(sub.H, rule=max_storage)
-
         # Storage Balance
         def stor_balance(sub, H):
             return sub.stor_level[H] == sub.stor_level[H-1] - sub.stor_net_i[H]
