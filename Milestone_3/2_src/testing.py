@@ -4,6 +4,7 @@ from pyomo.opt import SolverFactory
 import numpy as np
 import os
 from pathlib import Path
+import pandas as pd
 
 from modeling_helper.utilities import *
 from modeling_helper.printing import *
@@ -33,17 +34,20 @@ TEST_SAMPLES = get_monte_carlo_samples(LOADS, samples=test_size, seed=seed)
 # Define a list of approaches.
 APPROACHES = ['stochastic', 'deterministic']
 
+# Define storage level for testing
+stor_level_max = 4
+
 # All other parameteres are defined in the file 'parameters.py'
 
 # **************************************************************************
 # Testing
 # **************************************************************************
 
-# Create dictionary for approach and for storage capacities to store objective
-# value.
-objective_values = {
-    approach: [] for approach in APPROACHES
-}
+# Create dictionary for objective values.
+objective_values = {approach: [] for approach in APPROACHES}
+
+# Create dictionary for results
+results_dic = {approach: {} for approach in APPROACHES}
 
 for approach in APPROACHES:
 
@@ -63,21 +67,19 @@ for approach in APPROACHES:
         sample_size,
         current_path)
 
-    print_caption(f'Solution for {stor_levels_max[0]} kWh')
-    # Init result dictionary.
-    results_dic = {}
+    print_caption(f'Solution for {stor_level_max} kWh')
 
     # Open result model json file
     try:
         with open(
-            os.path.join(path, f'results_master_{stor_levels_max[0]}.json')
+            os.path.join(path, f'results_master_{stor_level_max}.json')
             ) as f:
             # returns JSON object as a dictionary
             parameter = json.load(f)
     except:
         print(
             'Attention! File '
-            + os.path.join(path, f'results_master_{stor_levels_max[0]}.json')
+            + os.path.join(path, f'results_master_{stor_level_max}.json')
             + ' not found.'
         )
         break
@@ -85,7 +87,7 @@ for approach in APPROACHES:
 
     for i, sample in enumerate(TEST_SAMPLES):
 
-        print_status(i)
+        print_status(i, test_size)
 
         # ******************************************************************
         # Model
@@ -97,30 +99,45 @@ for approach in APPROACHES:
         # Sets
         # ******************************************************************
 
-        # hour set
-        model.H = pyo.RangeSet(0,len(HOURS)-1)
+        # Hour sets
+        model.H = pyo.RangeSet(1,len(HOURS)-1)
+        model.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
         # ******************************************************************
         # Variables
         # ******************************************************************
 
         # Fixed model problem variables
-        model.u = pyo.Var(model.H)
-        model.p1 = pyo.Var(model.H)
+        model.u = pyo.Var(model.H_all)
+        model.p1 = pyo.Var(model.H_all)
+        for h in model.H_all:
+            model.u[h].fix(parameter['u'][str(h)])
+            model.p1[h].fix(parameter['p1'][str(h)])
 
         # Electricity produced by generator
-        model.pg = pyo.Var(model.H, within=pyo.NonNegativeReals)
+        model.pg = pyo.Var(model.H_all, within=pyo.NonNegativeReals)
+        # Initialization for p1
+        model.pg[0].fix(0)
 
         # Electrictiy bought from retailer
-        model.p2 = pyo.Var(model.H, within=pyo.NonNegativeReals)
+        model.p2 = pyo.Var(model.H_all, within=pyo.NonNegativeReals)
+        # Initialization for p1
+        model.p2[0].fix(0)
 
         if esr:
-            # Net injection by storage with bounds of maximum charge and
-            # discharge.
-            model.stor_net_i = pyo.Var(model.H)
+            # Net injection by storage
+            model.stor_net_i = pyo.Var(model.H, bounds=(-p_w_max, p_i_max))
+            # Initialization for net injection
+            model.stor_net_i[0].fix(0)
 
             # Storage level
-            model.stor_level = pyo.Var(model.H, within=pyo.NonNegativeReals)
+            model.stor_level = pyo.Var(
+                model.H_all,
+                within=pyo.NonNegativeReals,
+                bounds=(0, stor_level_max)
+            )
+            # Initialization for net injection
+            model.stor_level[0].fix(0)
 
         # ******************************************************************
         # Objective function
@@ -137,58 +154,41 @@ for approach in APPROACHES:
         # Constraints
         # ******************************************************************
 
-        # Init of forward contract
-        def p1_zero(model):
-            return model.p1[0] == 0
-        model.p1_zero = pyo.Constraint(rule=p1_zero)
-
         if up_down_time:
             # Minimum uptime constraint
             def min_uptime(model, H):
-                # In order to avoid applying this constraint for hour 0,
-                # check for index.
-                if H != 0:
-                    # Apply minimum uptime constraint.
-                    # The end value of the range function needs to be increased
-                    # to be included.
-                    V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
-                    # For the last hour, the ouput of the range function is 0
-                    # because range(24,24). To include hour 24 into the list,
-                    # check for length and put hour 24 into V.
-                    if len(V) == 0:
-                        V = [H]
-                    # Return the sum of all hours in V to apply the constraint
-                    # for all hours in V.
-                    return sum(
-                        model.u[H] - model.u[H-1] for v in V
-                        ) <= sum(model.u[v] for v in V)
-                else:
-                    # Initialize unit commitment in hour 0.
-                    return model.u[H] == 0
+                # Apply minimum uptime constraint.
+                # The end value of the range function needs to be increased
+                # to be included.
+                V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
+                # For the last hour, the ouput of the range function is 0
+                # because range(24,24). To include hour 24 into the list,
+                # check for length and put hour 24 into V.
+                if len(V) == 0:
+                    V = [H]
+                # Return the sum of all hours in V to apply the constraint
+                # for all hours in V.
+                return sum(
+                    model.u[H] - model.u[H-1] for v in V
+                    ) <= sum(model.u[v] for v in V)
             model.min_uptime = pyo.Constraint(model.H, rule=min_uptime)
 
             # Minimum downtime constraint
             def min_downtime(model, H):
-                # In order to avoid applying this constraint for hour 0, check
-                # for index.
-                if H != 0:
-                    # Apply minimum downtime constraint.
-                    # The end value of the range function needs to be increased
-                    # to be included.
-                    V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
-                    # For the last hour, the ouput of the range function is 0
-                    # because range(24,24). To include hour 24 into the list,
-                    # check for length and put hour 24 into V.
-                    if len(V) == 0:
-                        V = [H]
-                    # Return the sum of all hours in V to apply the constraint
-                    # for all hours in V.
-                    return sum(
-                        model.u[H-1] - model.u[H] for v in V
-                        ) <= sum(1 - model.u[v] for v in V)
-                else:
-                    # Initialize unit commitment in hour 0.
-                    return model.u[H] == 0
+                # Apply minimum downtime constraint.
+                # The end value of the range function needs to be increased
+                # to be included.
+                V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
+                # For the last hour, the ouput of the range function is 0
+                # because range(24,24). To include hour 24 into the list,
+                # check for length and put hour 24 into V.
+                if len(V) == 0:
+                    V = [H]
+                # Return the sum of all hours in V to apply the constraint
+                # for all hours in V.
+                return sum(
+                    model.u[H-1] - model.u[H] for v in V
+                    ) <= sum(1 - model.u[v] for v in V)
             model.min_downtime = pyo.Constraint(model.H, rule=min_downtime)
 
         # Take first random vector from samples
@@ -214,70 +214,70 @@ for approach in APPROACHES:
         if ramping:
             # Ramping constraint of generator
             def con_ramping(model, H):
-                if H != 0:
-                    return (
-                        -ramping_constraint,
-                        model.pg[H] - model.pg[H-1],
-                        ramping_constraint
-                    )
-                else:
-                    return model.pg[H] == 0
+                return (
+                    -ramping_constraint,
+                    model.pg[H] - model.pg[H-1],
+                    ramping_constraint
+                )
             model.con_ramping = pyo.Constraint(model.H, rule=con_ramping)
 
         if esr:
-            # Constraint for net injection by storage
-            def max_net_i(model, H):
-                if H != 0:
-                    return (-p_w_max, model.stor_net_i[H], p_i_max)
-                else:
-                    return model.stor_net_i[H] == 0
-            model.max_net_i = pyo.Constraint(model.H, rule=max_net_i)
-
-            # Maximum Storage Level
-            def max_storage(model, H):
-                return model.stor_level[H] <= stor_levels_max[0]
-            model.max_storage = pyo.Constraint(model.H, rule=max_storage)
-
             # Storage Balance
             def stor_balance(model, H):
-                if H != 0:
-                    return model.stor_level[H] == (
-                        model.stor_level[H-1] - model.stor_net_i[H]
-                    )
-                else:
-                    return model.stor_level[H] == 0
+                return model.stor_level[H] == (
+                    model.stor_level[H-1] - model.stor_net_i[H]
+                )
             model.stor_balance = pyo.Constraint(model.H, rule=stor_balance)
-
-        # ensure variable u is equal to the solution of the model problem
-        def dual_con1(model, H):
-            return model.u[H] == parameter['u'][str(H)]
-        model.dual_con1 = pyo.Constraint(model.H, rule=dual_con1)
-
-        # ensure variable p1 is equal to the solution of the model problem
-        def dual_con2(model, H):
-            return model.p1[H] == parameter['p1'][str(H)]
-        model.dual_con2 = pyo.Constraint(model.H, rule=dual_con2)
 
         # solve model
         solve_model(opt, model)
 
-        results_dic[i] = get_results(model)
+        results_dic[approach][i] = get_results(model)
 
         objective_values[approach].append(pyo.value(model.OBJ))
 
-    print()
-    print()
-    print_caption('End')
+    # **************************************************************************
+    # Export
+    # **************************************************************************
 
-        # with open(
-        #     f'{path}testing_{approach}_results_{l2}.json', 'w'
-        # ) as outfile:
-        #     json.dump(results_dic, outfile)
+    if output:
+        saving_path = os.path.join(path, 'testing')
+        # Make sure that folders exist
+        if not os.path.exists(saving_path):
+            os.makedirs(saving_path)
+        print(f'Exporting results to: {saving_path}')
 
-# # save objectives
-# path_save_test = os.path.join(current_path, '3_results', app)
-# with open(f'{path}testing_objectives.json', 'w') as outfile:
-#     json.dump(objective_values, outfile)
+        #-----------------------------------------------------------------------
+        # Model results
+        #-----------------------------------------------------------------------
 
-# print(np.mean(np.array(objective_values['Stochastic']['0.3'])))
-# print(np.mean(np.array(objective_values['Deterministic']['0.3'])))
+        with open(
+            os.path.join(
+                saving_path,
+                f'testing_results_{stor_level_max}_{test_size}.json'
+            ), 'w') as outfile:
+            json.dump(results_dic[approach], outfile)
+
+        #-----------------------------------------------------------------------
+        # Objective values
+        #-----------------------------------------------------------------------
+
+        # Save objectives
+        np.array(objective_values[approach]).tofile(
+            os.path.join(
+                saving_path,
+                f'objective_values_{stor_level_max}_{test_size}.csv'),
+            sep=','
+        )
+
+        mean = np.mean(objective_values[approach])
+        variance = np.var(objective_values[approach])
+        pd.DataFrame({'Mean': [mean], 'Variance': [variance]}).to_csv(
+            os.path.join(
+                saving_path,
+                f'mean_var_{stor_level_max}_{test_size}.csv'),
+            sep=','
+        )
+
+        print()
+        print_caption('End')
