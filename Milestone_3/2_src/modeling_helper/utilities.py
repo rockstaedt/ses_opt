@@ -175,7 +175,8 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
     return path
 
 def solve_sample(sample:list, iterator:int, sample_size:int,
-                  model:pyo.ConcreteModel, solver:SolverFactory) -> Dict:
+                 model:pyo.ConcreteModel, solver:SolverFactory,
+                 obj_value:bool=False) -> Dict:
     """
     This function solves the model for the given sample, updating the
     corresponding constraint and printing a status to the terminal.
@@ -186,6 +187,7 @@ def solve_sample(sample:list, iterator:int, sample_size:int,
         sample_size (int): size of samples
         model (pyo.ConcreteModel): Pyomo model to solve
         solver (pyo.opt.SolverFactory): solver for Pyomo model
+        obj_value (bool): Boolean for including objective value into result dic
 
     Returns:
         Dict: Dictionary of result values
@@ -197,8 +199,11 @@ def solve_sample(sample:list, iterator:int, sample_size:int,
     model.con_load.reconstruct()
     # Solve model
     solve_model(solver, model)
-    # Get results and dual variables of master problem constraints
+    # Get results and dual variables of master problem constraints.
     results = get_results(model, dual=True)
+    # Add objective value, if specified.
+    if obj_value:
+        results['objective_value'] = pyo.value(model.OBJ)
     return results
 
 def set_load_values(model:pyo.ConcreteModel, load_values:list):
