@@ -334,17 +334,21 @@ for stor_level_max in stor_levels_max:
 
     print(f'Solving sub problem for samples size = {sample_size}')
 
-    # Use concurrent package to enable multiprocessing to solve sample in
-    # paralell.
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = executor.map(
-            solve_sample,
-            SAMPLES,
-            list(range(len(SAMPLES))),
-            [len(SAMPLES)] * len(SAMPLES),
-            [sub] * len(SAMPLES),
-            [opt] * len(SAMPLES)
-        )
+    # Avoid error on Windows, see:
+    # https://stackoverflow.com/questions/18204782/
+    # runtimeerror-on-windows-trying-python-multiprocessing
+    if __name__ == '__main__':
+        # Use concurrent package to enable multiprocessing to solve sample in
+        # paralell.
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(
+                solve_sample,
+                SAMPLES,
+                list(range(len(SAMPLES))),
+                [len(SAMPLES)] * len(SAMPLES),
+                [sub] * len(SAMPLES),
+                [opt] * len(SAMPLES)
+            )
 
     # Results are stored in a map object and have to be unpacked into a dict.
     results_sub = {}
@@ -401,15 +405,16 @@ for stor_level_max in stor_levels_max:
 
         # Use concurrent package to enable multiprocessing to solve sample in
         # paralell.
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            results = executor.map(
-                solve_sample,
-                SAMPLES,
-                list(range(len(SAMPLES))),
-                [len(SAMPLES)] * len(SAMPLES),
-                [sub] * len(SAMPLES),
-                [opt] * len(SAMPLES)
-            )
+        if __name__ == '__main__':
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                results = executor.map(
+                    solve_sample,
+                    SAMPLES,
+                    list(range(len(SAMPLES))),
+                    [len(SAMPLES)] * len(SAMPLES),
+                    [sub] * len(SAMPLES),
+                    [opt] * len(SAMPLES)
+                )
 
         # Results are stored in a map object and have to be unpacked
         # into a dict.
