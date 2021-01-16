@@ -339,7 +339,7 @@ for stor_level_max in stor_levels_max:
     # runtimeerror-on-windows-trying-python-multiprocessing
     if __name__ == '__main__':
         # Use concurrent package to enable multiprocessing to solve sample in
-        # paralell.
+        # parallel.
         with concurrent.futures.ProcessPoolExecutor() as executor:
             results = executor.map(
                 solve_sample,
@@ -404,7 +404,7 @@ for stor_level_max in stor_levels_max:
         print(f'Solving sub problem for samples size = {sample_size}')
 
         # Use concurrent package to enable multiprocessing to solve sample in
-        # paralell.
+        # parallel.
         if __name__ == '__main__':
             with concurrent.futures.ProcessPoolExecutor() as executor:
                 results = executor.map(
