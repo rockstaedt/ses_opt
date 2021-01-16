@@ -19,7 +19,8 @@ def solve_all_samples(sample, iterator, sample_size, model, solver):
         # Update constraint
         model.con_load.reconstruct()
     # solve model
-    results = solve_model(opt, model)
+    solve_model(opt, model)
+    results = get_results(model)
     return results
 
 def set_load_values(model, load_values):
@@ -67,7 +68,6 @@ model.OBJ = pyo.Objective(
 )
 
 # Load must be covered by production or purchasing electrictiy.
-pl = SAMPLES[0, :]
 def con_load(model, H):
     return model.pg[H] + model.p1[H] >= model.load_values[H]
 model.con_load = pyo.Constraint(model.H, rule=con_load)
