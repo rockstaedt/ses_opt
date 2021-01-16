@@ -1,8 +1,12 @@
 import pyomo.environ as pyo
 from pyomo.core import Var, value
+from pyomo.opt import SolverFactory
 import numpy as np
 import os
 from pathlib import Path
+from typing import Dict
+
+from .printing import print_status
 
 def get_monte_carlo_samples(values:list, samples=1000, seed=12):
     """
@@ -169,3 +173,41 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
         path = os.path.join(path, 'sensitivity analysis')
 
     return path
+
+def solve_sample(sample:list, iterator:int, sample_size:int,
+                  model:pyo.ConcreteModel, solver:SolverFactory) -> Dict:
+    """
+    This function solves the model for the given sample, updating the
+    corresponding constraint and printing a status to the terminal.
+
+    Args:
+        sample (list): list of load values
+        iterator (int): number of sample
+        sample_size (int): size of samples
+        model (pyo.ConcreteModel): Pyomo model to solve
+        solver (pyo.opt.SolverFactory): solver for Pyomo model
+
+    Returns:
+        Dict: Dictionary of result values
+    """
+    print_status(iterator, sample_size)
+    # Set new load sample
+    set_load_values(model, sample)
+    # Update constraint
+    model.con_load.reconstruct()
+    # Solve model
+    solve_model(solver, model)
+    # Get results and dual variables of master problem constraints
+    results = get_results(model, dual=True)
+    return results
+
+def set_load_values(model:pyo.ConcreteModel, load_values:list):
+    """
+    This function sets a new load vector for the model variable 'load_values'.
+
+    Args:
+        model (pyo.ConcreteModel): Pyomo model
+        load_values (list): list of load vectors
+    """
+    for i, load_value in enumerate(load_values):
+        model.load_values[i] = load_value

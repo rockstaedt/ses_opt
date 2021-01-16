@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import os
 from pathlib import Path
+import concurrent.futures
 
 from modeling_helper.utilities import *
 from modeling_helper.printing import *
@@ -221,6 +222,13 @@ for stor_level_max in stor_levels_max:
     sub.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
     # **************************************************************************
+    # Sets
+    # **************************************************************************
+
+    # Create a parameter for the load values.
+    sub.load_values = pyo.Param(sub.H_all, mutable=True)
+
+    # **************************************************************************
     # Variables
     # **************************************************************************
 
@@ -275,19 +283,17 @@ for stor_level_max in stor_levels_max:
     # Constraints
     # **************************************************************************
 
-    # Take first random vector from samples
-    pl = SAMPLES[0, :]
     if esr:
         # Load must be covered by production, purchasing electrictiy or by net
         # injection of storage system.
         def con_load(sub, H):
             return (sub.pg[H] + sub.p1[H] + sub.p2[H]
-                + sub.stor_net_i[H]) >= pl[H]
+                + sub.stor_net_i[H]) >= sub.load_values[H]
         sub.con_load = pyo.Constraint(sub.H, rule=con_load)
     else:
         # Load must be covered by production or purchasing electrictiy.
         def con_load(sub, H):
-            return sub.pg[H] + sub.p1[H] + sub.p2[H] >= pl[H]
+            return sub.pg[H] + sub.p1[H] + sub.p2[H] >= sub.load_values[H]
         sub.con_load = pyo.Constraint(sub.H, rule=con_load)
 
     # maximum capacity of generator
@@ -328,19 +334,22 @@ for stor_level_max in stor_levels_max:
 
     print(f'Solving sub problem for samples size = {sample_size}')
 
+    # Use concurrent package to enable multiprocessing to solve sample in
+    # paralell.
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results = executor.map(
+            solve_sample,
+            SAMPLES,
+            list(range(len(SAMPLES))),
+            [len(SAMPLES)] * len(SAMPLES),
+            [sub] * len(SAMPLES),
+            [opt] * len(SAMPLES)
+        )
+
+    # Results are stored in a map object and have to be unpacked into a dict.
     results_sub = {}
-    for i, sample in enumerate(SAMPLES):
-        print_status(i, sample_size)
-        # Filter for first sample because that is set in the initialization of
-        # the model.
-        if i != 0:
-            # get new load sample
-            pl = sample
-            # update constraint
-            sub.con_load.reconstruct()
-        # solve model
-        solve_model(opt, sub)
-        results_sub[i] = get_results(sub, dual=True)
+    for i, result in enumerate(results):
+        results_sub[i] = result
 
     # check if upper and lower bound are converging
     converged, upper_bound, lower_bound = convergence_check(
@@ -389,17 +398,24 @@ for stor_level_max in stor_levels_max:
         sub.dual_con2.reconstruct()
 
         print(f'Solving sub problem for samples size = {sample_size}')
+
+        # Use concurrent package to enable multiprocessing to solve sample in
+        # paralell.
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(
+                solve_sample,
+                SAMPLES,
+                list(range(len(SAMPLES))),
+                [len(SAMPLES)] * len(SAMPLES),
+                [sub] * len(SAMPLES),
+                [opt] * len(SAMPLES)
+            )
+
+        # Results are stored in a map object and have to be unpacked
+        # into a dict.
         results_sub = {}
-        for i, sample in enumerate(SAMPLES):
-            # no if statement here because constraint con load is reconstructed
-            # with the first sample in samples
-            print_status(i, sample_size)
-            pl = sample
-            # update constraint
-            sub.con_load.reconstruct()
-            # solve model
-            solve_model(opt, sub)
-            results_sub[i] = get_results(sub, dual=True)
+        for i, result in enumerate(results):
+            results_sub[i] = result
 
         converged, upper_bound, lower_bound = convergence_check(
             objective,
