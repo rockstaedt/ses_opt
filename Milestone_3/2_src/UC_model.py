@@ -222,7 +222,7 @@ for stor_level_max in stor_levels_max:
     sub.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
     # **************************************************************************
-    # Sets
+    # Parameter
     # **************************************************************************
 
     # Create a parameter for the load values.
