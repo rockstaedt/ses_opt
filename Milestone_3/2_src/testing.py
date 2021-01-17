@@ -22,6 +22,8 @@ current_path = Path.cwd()
 
 # Model options are defined in the file 'model_options.py'.
 
+multiprocessing = True
+
 # ******************************************************************************
 # Parameters
 # ******************************************************************************
@@ -232,12 +234,9 @@ for approach in APPROACHES:
             )
         model.stor_balance = pyo.Constraint(model.H, rule=stor_balance)
 
-    # Avoid error on Windows, see:
-    # https://stackoverflow.com/questions/18204782/
-    # runtimeerror-on-windows-trying-python-multiprocessing
-    if __name__ == '__main__':
-        # Use concurrent package to enable multiprocessing to solve test samples in
-        # paralell.
+    if multiprocessing:
+        # Use concurrent package to enable multiprocessing to solve test samples
+        # in parallel.
         with concurrent.futures.ProcessPoolExecutor() as executor:
             results = executor.map(
                 solve_sample,
@@ -248,6 +247,18 @@ for approach in APPROACHES:
                 [opt] * len(TEST_SAMPLES),
                 [True] * len(TEST_SAMPLES)
             )
+    else:
+        # Solve model per iteration.
+        results = map(
+            solve_sample,
+            TEST_SAMPLES,
+            list(range(len(TEST_SAMPLES))),
+            [len(TEST_SAMPLES)] * len(TEST_SAMPLES),
+            [model] * len(TEST_SAMPLES),
+            [opt] * len(TEST_SAMPLES),
+            [True] * len(TEST_SAMPLES)
+
+        )
 
     # Results are stored in a map object and have to be unpacked
     # into a dict.
@@ -300,5 +311,5 @@ for approach in APPROACHES:
             sep=','
         )
 
-        print()
-        print_caption('End')
+    print()
+    print_caption('End')
