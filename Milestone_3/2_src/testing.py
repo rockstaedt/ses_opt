@@ -132,7 +132,7 @@ for approach in APPROACHES:
 
     if esr:
         # Net injection by storage
-        model.stor_net_i = pyo.Var(model.H, bounds=(-p_w_max, p_i_max))
+        model.stor_net_i = pyo.Var(model.H_all, bounds=(-p_w_max, p_i_max))
         # Initialization for net injection
         model.stor_net_i[0].fix(0)
 
