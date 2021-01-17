@@ -308,7 +308,8 @@ for approach in APPROACHES:
             os.path.join(
                 saving_path,
                 f'mean_var_{stor_level_max}_{test_size}.csv'),
-            sep=','
+            sep=',',
+            index=False
         )
 
     print()
