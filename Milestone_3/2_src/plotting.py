@@ -37,7 +37,7 @@ saving_path = os.path.join(current_path.parent, '4_plots')
 ### Computation time all tasks, all sample sizes
 ###############################################################################
 
-sample_sizes = [10, 100, 1000, 10000]
+sample_sizes = [10, 100, 1000, 10000, 100000]
 
 computation_times = {'task_'+str(i): [] for i in range(1,4)}
 
@@ -70,9 +70,10 @@ plt.plot(
     label='Task 3',
     marker='x')
 plt.legend()
-plt.xlabel('Sample Size')
+plt.xlabel('Sample size')
 plt.ylabel('Computation time in [s]')
 plt.xscale('log')
+plt.yscale('log')
 
 plt.savefig(
     os.path.join(saving_path, 'computation_times.png'),
