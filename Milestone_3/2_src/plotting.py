@@ -350,7 +350,7 @@ ax5.plot(b,means3,color='darkgreen',label='Case 3')
 
 
 ax5.set_xlabel('Sample Size',fontsize=15)
-ax5.set_ylabel('Objective Value',fontsize=15)
+ax5.set_ylabel('Mean Objective Value',fontsize=15)
 ax5.set_xticks(b,sz)
 ax5.grid()
 ax5.legend(fontsize=13)
@@ -361,3 +361,78 @@ if output:
         dpi=dpi,
         bbox_inches='tight'
     )
+
+###############################################################################
+### Mean
+###############################################################################
+
+power_values = {
+    'det': {mix: [] for mix in generation_mix},
+    'stoch': {mix: [] for mix in generation_mix}
+}
+
+path = os.path.join(
+    results_path,
+    'deterministic',
+    'task_1',
+    'testing',
+    'testing_results_4_1000.json'
+)
+
+with open(path) as f:
+    # returns JSON object as a dictionary
+    results = json.load(f)
+
+for sample, dic_var in results.items():
+    pg = 0
+    p1 = 0
+    p2 = 0
+    for var, dic_values in dic_var.items():
+        if var == 'pg':
+            for hour, value in dic_values.items():
+                pg += float(value)
+        if var == 'p1':
+            for hour, value in dic_values.items():
+                p1 += float(value)
+        if var == 'p2':
+            for hour, value in dic_values.items():
+                p2 += float(value)
+    power_values['det']['pg'].append(pg)
+    power_values['det']['p1'].append(p1)
+    power_values['det']['p2'].append(p2)
+
+path = os.path.join(
+    results_path,
+    'stochastic',
+    'task_1',
+    '100000',
+    'testing',
+    'testing_results_4_1000.json'
+)
+
+with open(path) as f:
+    # returns JSON object as a dictionary
+    results = json.load(f)
+
+for sample, dic_var in results.items():
+    pg = 0
+    p1 = 0
+    p2 = 0
+    for var, dic_values in dic_var.items():
+        if var == 'pg':
+            for hour, value in dic_values.items():
+                pg += float(value)
+        if var == 'p1':
+            for hour, value in dic_values.items():
+                p1 += float(value)
+        if var == 'p2':
+            for hour, value in dic_values.items():
+                p2 += float(value)
+    power_values['stoch']['pg'].append(pg)
+    power_values['stoch']['p1'].append(p1)
+    power_values['stoch']['p2'].append(p2)
+
+for approach in ['det', 'stoch']:
+    print(approach)
+    for mix in generation_mix:
+        print(mix, np.mean(power_values[approach][mix]))
