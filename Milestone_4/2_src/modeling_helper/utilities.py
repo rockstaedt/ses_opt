@@ -99,7 +99,7 @@ def get_loads():
         0,8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
     ]
 
-def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
+def get_path_by_task(mc_sampling:bool, av_sampling:bool, lhc_sampling:bool,
                      deterministic:bool, sensitivity_analysis:bool,
                      sample_size:int, current_path:Path) -> str:
     """
@@ -110,25 +110,30 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
     """
     # Determine first level saving path
     if deterministic:
-        if (not up_down_time and not ramping and not esr
-            and not sensitivity_analysis):
+        if (not ev and not sensitivity_analysis):
             path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_1')
-        elif up_down_time and ramping and not esr and not sensitivity_analysis:
+                current_path.parent, '3_results', 'deterministic', 'task_1_4')
+        elif (ev and not sensitivity_analysis):
             path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_2')
-        elif up_down_time and ramping and esr and not sensitivity_analysis:
+                current_path.parent,
+                '3_results',
+                'deterministic',
+                'task_5'
+            )
+        elif (ev and sensitivity_analysis):
             path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_3')
-        elif up_down_time and ramping and esr and sensitivity_analysis:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_4')
+                current_path.parent,
+                '3_results',
+                'deterministic',
+                'task_5',
+                'sensitivity_analysis'
+            )
         else:
             path = os.path.join(
                 current_path.parent, '3_results', 'deterministic', 'no_task')
     else:
-        if (not up_down_time and not ramping and not esr
-            and not sensitivity_analysis):
+        if (not mc_sampling and av_sampling and not lhc_sampling
+            and multiprocessing and not sensitivity_analysis):
             path = os.path.join(
                 current_path.parent,
                 '3_results',
@@ -136,7 +141,8 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 'task_1',
                 str(sample_size)
             )
-        elif up_down_time and ramping and not esr and not sensitivity_analysis:
+        elif (not mc_sampling and not av_sampling and lhc_sampling
+            and multiprocessing and not sensitivity_analysis):
             path = os.path.join(
                 current_path.parent,
                 '3_results',
@@ -144,20 +150,44 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 'task_2',
                 str(sample_size)
             )
-        elif up_down_time and ramping and esr and not sensitivity_analysis:
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_3',
-                str(sample_size)
-            )
-        elif up_down_time and ramping and esr and sensitivity_analysis:
+        elif (not mc_sampling and av_sampling and not lhc_sampling
+            and not multiprocessing and not sensitivity_analysis):
             path = os.path.join(
                 current_path.parent,
                 '3_results',
                 'stochastic',
                 'task_4',
+                'av_sampling',
+                str(sample_size)
+            )
+        elif (not mc_sampling and not av_sampling and lhc_sampling
+            and not multiprocessing and not sensitivity_analysis):
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_4',
+                'lhc_sampling',
+                str(sample_size)
+            )
+        elif (not mc_sampling and av_sampling and not lhc_sampling
+                and not sensitivity_analysis):
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_5',
+                'av_sampling',
+                str(sample_size)
+            )
+        elif (not mc_sampling and av_sampling and not lhc_sampling
+                and sensitivity_analysis):
+            path = os.path.join(
+                current_path.parent,
+                '3_results',
+                'stochastic',
+                'task_5',
+                'sensitivity_analysis',
                 str(sample_size)
             )
         else:
@@ -168,9 +198,6 @@ def get_path_by_task(up_down_time:bool, ramping:bool, esr:bool,
                 'no_task',
                 str(sample_size)
             )
-
-    if sensitivity_analysis:
-        path = os.path.join(path, 'sensitivity analysis')
 
     return path
 
