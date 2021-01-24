@@ -11,15 +11,19 @@ deterministic = True
 sensitivity_analysis = False
 
 # This option enables the output of result files, saved into '3_results'.
-output = True
+output = False
 
-# This option enables the implementation of uptime and downtime constraint of
-# the generator
-up_down_time = True
+# This option enables the sampling using Crude Monte Carlo.
+mc_sampling = True
 
-# This option enables the implementation of the ramping constraint of the
-# generator
-ramping = True
+# This option enables the sampling using the Antithetic Variates technique.
+av_sampling = False
 
-# This option enables the implementation of an energy storage resource.
-esr = False
+# This option enables the sampling using the Latin Hypercube Sampling technique.
+lhc_sampling = False
+
+# This option enables multiprocessing during the optimization.
+multiprocessing = True
+
+# This option enables the implementation of an electric vehicle.
+ev = True

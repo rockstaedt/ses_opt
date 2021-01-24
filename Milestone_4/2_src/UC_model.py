@@ -34,11 +34,18 @@ if deterministic:
     SAMPLES = np.array([LOADS])
     sample_size = 1
 else:
-    SAMPLES = get_monte_carlo_samples(
-        LOADS,
-        samples=sample_size,
-        seed=seed
-    )
+    if mc_sampling:
+        SAMPLES = get_monte_carlo_samples(
+            LOADS,
+            samples=sample_size,
+            seed=seed
+        )
+    elif av_sampling:
+        SAMPLES = get_av_samples(
+            LOADS,
+            samples=sample_size,
+            seed=seed
+        )
 
 # All other parameteres are defined in the file 'parameters.py'
 
@@ -69,18 +76,18 @@ def master_prob(u, p1, alpha):
     return sum(c1*u[h] + l1*p1[h] + alpha[h] for h in HOURS)
 
 # Dataframe for computation times
-times_dic = {'stor_level': [], 'time': [], 'iterations': []}
+times_dic = {'charge_target': [], 'time': [], 'iterations': []}
 
 # Loop over all storage capacities and solve the L-shape method.
-for stor_level_max in stor_levels_max:
+for charge_target in charge_targets:
 
     if deterministic:
         print_title(
-            f'Solve L-Shape method for {stor_level_max} kWh - Deterministic'
+            f'Solve L-Shape method for {charge_target*100} % - Deterministic'
         )
     else:
         print_title(
-            f'Solve L-Shape method for {stor_level_max} kWh - Stochastic'
+            f'Solve L-Shape method for {charge_target*100} % - Stochastic'
         )
 
     #---------------------------------------------------------------------------
@@ -150,42 +157,41 @@ for stor_level_max in stor_levels_max:
         return master.alpha[H] >= -500
     master.alphacon1 = pyo.Constraint(master.H, rule=alphacon1)
 
-    if up_down_time:
-        # Minimum uptime constraint
-        def min_uptime(master, H):
-            # Apply minimum uptime constraint.
-            # The end value of the range function needs to be increased to
-            # be included.
-            V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0
-            # because range(24,24). To include hour 24 into the list,
-            # check for length and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint for
-            # all hours in V.
-            return sum(
-                master.u[H] - master.u[H-1] for v in V
-                ) <= sum(master.u[v] for v in V)
-        master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
+    # Minimum uptime constraint
+    def min_uptime(master, H):
+        # Apply minimum uptime constraint.
+        # The end value of the range function needs to be increased to
+        # be included.
+        V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
+        # For the last hour, the ouput of the range function is 0
+        # because range(24,24). To include hour 24 into the list,
+        # check for length and put hour 24 into V.
+        if len(V) == 0:
+            V = [H]
+        # Return the sum of all hours in V to apply the constraint for
+        # all hours in V.
+        return sum(
+            master.u[H] - master.u[H-1] for v in V
+            ) <= sum(master.u[v] for v in V)
+    master.min_uptime = pyo.Constraint(master.H, rule=min_uptime)
 
-        # Minimum downtime constraint
-        def min_downtime(master, H):
-            # Apply minimum downtime constraint.
-            # The end value of the range function needs to be increased to
-            # be included.
-            V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0
-            # because range(24,24). To include hour 24 into the list,
-            # check for length and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint for
-            # all hours in V.
-            return sum(
-                master.u[H-1] - master.u[H] for v in V
-                ) <= sum(1 - master.u[v] for v in V)
-        master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
+    # Minimum downtime constraint
+    def min_downtime(master, H):
+        # Apply minimum downtime constraint.
+        # The end value of the range function needs to be increased to
+        # be included.
+        V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
+        # For the last hour, the ouput of the range function is 0
+        # because range(24,24). To include hour 24 into the list,
+        # check for length and put hour 24 into V.
+        if len(V) == 0:
+            V = [H]
+        # Return the sum of all hours in V to apply the constraint for
+        # all hours in V.
+        return sum(
+            master.u[H-1] - master.u[H] for v in V
+            ) <= sum(1 - master.u[v] for v in V)
+    master.min_downtime = pyo.Constraint(master.H, rule=min_downtime)
 
     #---------------------------------------------------------------------------
     # Initialization of master problem
@@ -221,6 +227,9 @@ for stor_level_max in stor_levels_max:
     sub.H = pyo.RangeSet(1, len(HOURS)-1)
     sub.H_all = pyo.RangeSet(0, len(HOURS)-1)
 
+    # Set of energy storage resources.
+    sub.ESR = pyo.Set(initialize=esr_types)
+
     # **************************************************************************
     # Parameter
     # **************************************************************************
@@ -243,33 +252,46 @@ for stor_level_max in stor_levels_max:
 
     # Electricity produced by generator
     sub.pg = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
-
     # Initialization of pg
     sub.pg[0].fix(0)
 
     # Electrictiy bought from retailer
     sub.p2 = pyo.Var(sub.H_all, within=pyo.NonNegativeReals)
-
     # Initialization of pg
     sub.p2[0].fix(0)
 
-    if esr:
-        # Net injection by storage with bounds of maximum charge and discharge.
-        sub.stor_net_i = pyo.Var(sub.H_all,  bounds=(-p_w_max, p_i_max))
+    # Net injection by storage with bounds of maximum charge and discharge.
+    # Create function to get the bounds for corresponding ESR.
+    def get_net_bounds(sub, ESR, H):
+        return (-esr_to_p_w_max[ESR], esr_to_p_i_max[ESR])
+    sub.stor_net_i = pyo.Var(
+        sub.ESR,
+        sub.H_all,
+        bounds=get_net_bounds
+    )
+    # Initialization of storage net injection for all ESR.
+    for esr in esr_types:
+        sub.stor_net_i[esr, 0].fix(0)#
 
-        # Initialization of storage net injection
-        sub.stor_net_i[0].fix(0)
+    # Storage level in kWh
+    # Create function to get max storage level for corresponding ESR.
+    def get_stor_levels(sub, ESR, H):
+        return (0, esr_to_stor_level_max[ESR])
+    sub.stor_level = pyo.Var(
+        sub.ESR,
+        sub.H_all,
+        within=pyo.NonNegativeReals,
+        bounds=get_stor_levels
+    )
+    # Initialization of storage level for all ESR.
+    for esr in esr_types:
+        sub.stor_level[esr, 0].fix(esr_to_stor_level_zero[esr])
 
-        # Storage level
-        sub.stor_level = pyo.Var(
-            sub.H_all,
-            within=pyo.NonNegativeReals,
-            bounds=(0, stor_level_max)
+    if ev:
+        # Ensure charge target for ev in the last hour.
+        sub.stor_level['ev', sub.H_all[-1]].fix(
+            esr_to_stor_level_max['ev'] * charge_target
         )
-
-        # Initialization of storage level
-        sub.stor_level[0].fix(0)
-
 
     # **************************************************************************
     # Objective function
@@ -283,47 +305,41 @@ for stor_level_max in stor_levels_max:
     # Constraints
     # **************************************************************************
 
-    if esr:
-        # Load must be covered by production, purchasing electrictiy or by net
-        # injection of storage system.
-        def con_load(sub, H):
-            return (sub.pg[H] + sub.p1[H] + sub.p2[H]
-                + sub.stor_net_i[H]) >= sub.load_values[H]
-        sub.con_load = pyo.Constraint(sub.H, rule=con_load)
-    else:
-        # Load must be covered by production or purchasing electrictiy.
-        def con_load(sub, H):
-            return sub.pg[H] + sub.p1[H] + sub.p2[H] >= sub.load_values[H]
-        sub.con_load = pyo.Constraint(sub.H, rule=con_load)
+    # Load must be covered by production, purchasing electrictiy or by the
+    # sum of net injections over all esr.
+    def con_load(sub, H):
+        return (sub.pg[H] + sub.p1[H] + sub.p2[H]
+            + sum(sub.stor_net_i[esr, H] for esr in sub.ESR)
+            ) >= sub.load_values[H]
+    sub.con_load = pyo.Constraint(sub.H, rule=con_load)
 
-    # maximum capacity of generator
+    # Maximum capacity of generator
     def con_max(sub, H):
         return sub.pg[H] <= pmax*sub.u[H]
     sub.con_max = pyo.Constraint(sub.H, rule=con_max)
 
-    # ensure variable u is equal to the solution of the master problem
+    # Ensure variable u is equal to the solution of the master problem.
     def dual_con1(sub, H):
         return sub.u[H] == results_master['u'][H]
     sub.dual_con1 = pyo.Constraint(sub.H_all, rule=dual_con1)
 
-    # ensure variable p1 is equal to the solution of the master problem
+    # Ensure variable p1 is equal to the solution of the master problem.
     def dual_con2(sub, H):
         return sub.p1[H] == results_master['p1'][H]
     sub.dual_con2 = pyo.Constraint(sub.H_all, rule=dual_con2)
 
-    if ramping:
-        # Ramping constraint of generator
-        def con_ramping(sub, H):
-            return (
-                -ramping_constraint, sub.pg[H] - sub.pg[H-1], ramping_constraint
-            )
-        sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
+    # Ramping constraint of generator
+    def con_ramping(sub, H):
+        return (
+            -ramping_constraint, sub.pg[H] - sub.pg[H-1], ramping_constraint
+        )
+    sub.con_ramping = pyo.Constraint(sub.H, rule=con_ramping)
 
-    if esr:
-        # Storage Balance
-        def stor_balance(sub, H):
-            return sub.stor_level[H] == sub.stor_level[H-1] - sub.stor_net_i[H]
-        sub.stor_balance = pyo.Constraint(sub.H, rule=stor_balance)
+    # Storage Balance
+    def stor_balance(sub, ESR, H):
+        return sub.stor_level[ESR, H] == (
+            sub.stor_level[ESR, H-1] - sub.stor_net_i[ESR, H])
+    sub.stor_balance = pyo.Constraint(sub.ESR, sub.H, rule=stor_balance)
 
     #---------------------------------------------------------------------------
     # Initialization of sub problem
@@ -338,6 +354,29 @@ for stor_level_max in stor_levels_max:
     # paralell.
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = executor.map(
+            solve_sample,
+            SAMPLES,
+            list(range(len(SAMPLES))),
+            [len(SAMPLES)] * len(SAMPLES),
+            [sub] * len(SAMPLES),
+            [opt] * len(SAMPLES)
+        )
+
+    if multiprocessing:
+        # Use concurrent package to enable multiprocessing to solve test samples
+        # in parallel.
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(
+                solve_sample,
+                SAMPLES,
+                list(range(len(SAMPLES))),
+                [len(SAMPLES)] * len(SAMPLES),
+                [sub] * len(SAMPLES),
+                [opt] * len(SAMPLES)
+            )
+    else:
+        # Solve model per iteration.
+        results = map(
             solve_sample,
             SAMPLES,
             list(range(len(SAMPLES))),
@@ -434,24 +473,24 @@ for stor_level_max in stor_levels_max:
 
     print_caption('End')
 
-    times_dic['iterations'].append(iteration)
-
     ############################################################################
     ### Results & Exports
     ############################################################################
 
     time_end = tm.time()
-    times_dic['stor_level'].append(str(stor_level_max))
+    times_dic['charge_target'].append(str(charge_target))
     times_dic['time'].append(time_end - time_start)
+    times_dic['iterations'].append(iteration)
     print('Computation time:')
     print(f'\t{round(time_end - time_start, 2)}s')
 
     current_path = Path.cwd()
 
     path = get_path_by_task(
-        up_down_time,
-        ramping,
-        esr,
+        mc_sampling,
+        av_sampling,
+        lhc_sampling,
+        ev,
         deterministic,
         sensitivity_analysis,
         sample_size,
@@ -498,7 +537,7 @@ for stor_level_max in stor_levels_max:
 #---------------------------------------------------------------------------
 
 time_end_all = tm.time()
-times_dic['stor_level'].append('TOTAL')
+times_dic['charge_target'].append('TOTAL')
 times_dic['time'].append(time_end_all - time_start_all)
 times_dic['iterations'].append(0)
 if sensitivity_analysis:
