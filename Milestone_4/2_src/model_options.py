@@ -21,5 +21,5 @@ up_down_time = True
 # generator
 ramping = True
 
-# This option enables the implementation of a energy storage resource.
+# This option enables the implementation of an energy storage resource.
 esr = False
