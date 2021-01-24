@@ -22,6 +22,22 @@ def get_monte_carlo_samples(values:list, samples=1000, seed=12):
     # return random samples from normal distribution
     return np.random.multivariate_normal(values, cov_pl, size=samples)
 
+def get_av_samples(values:list, sample_size=1000, seed=12):
+    """
+    This function creates a sample using the athetic variates technique.
+    """
+    # Set seed
+    np.random.seed(seed)
+    # Covariance matrix of values. Variance was given.
+    cov_pl = np.diagflat(np.array(values)*1/3)
+    # Calculate normal distribution for half of the sample size.
+    normal_dis = np.random.multivariate_normal(values, cov_pl, size=int(sample_size/2))
+    # Calculate athetics of these sample
+    antithetics = np.array(values) - (normal_dis - np.array(values))
+    # Concatenate both samples to one.
+    samples = np.concatenate((normal_dis, antithetics))
+    return samples
+
 def solve_model(solver, model):
     """
     This function solves a pyomo model with the passed solver.
