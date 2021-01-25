@@ -507,13 +507,13 @@ for charge_target in charge_targets:
     if output:
         # Save only the sub results of the last iteration and last sample.
         with open(
-            os.path.join(path, f'results_sub_{stor_level_max}.json'),
+            os.path.join(path, f'results_sub_{charge_target}.json'),
             'w') as outfile:
             last_key = list(results_sub.keys())[-1]
             json.dump(results_sub[last_key], outfile)
 
         with open(
-            os.path.join(path, f'results_master_{stor_level_max}.json'),
+            os.path.join(path, f'results_master_{charge_target}.json'),
             'w') as outfile:
             json.dump(results_master, outfile)
 
@@ -524,11 +524,11 @@ for charge_target in charge_targets:
     if output:
         # Export upper and lower bounds
         np.array(objective_values).tofile(
-            os.path.join(path, f'objective_values_{stor_level_max}.csv'),
+            os.path.join(path, f'objective_values_{charge_target}.csv'),
             sep = ','
         )
         np.array(lower_bounds).tofile(
-            os.path.join(path, f'lower_bounds_{stor_level_max}.csv'),
+            os.path.join(path, f'lower_bounds_{charge_target}.csv'),
             sep = ','
         )
 
