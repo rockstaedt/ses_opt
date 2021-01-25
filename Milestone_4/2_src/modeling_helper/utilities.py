@@ -24,7 +24,7 @@ def get_monte_carlo_samples(values:list, samples=1000, seed=12):
 
 def get_av_samples(values:list, sample_size=1000, seed=12):
     """
-    This function creates a sample using the athetic variates technique.
+    This function creates a sample using the antithetic variates technique.
     """
     # Set seed
     np.random.seed(seed)
@@ -37,6 +37,24 @@ def get_av_samples(values:list, sample_size=1000, seed=12):
     # Concatenate both samples to one.
     samples = np.concatenate((normal_dis, antithetics))
     return samples
+
+def get_lhs_sample(sample_size = 1000,loads = LOADS,seed = 12):
+    """
+    This function creates a sample using the latin hyper cube technique.
+    """
+    #set seed
+    np.random.seed(seed)
+    #pull lhs distribution
+    design = lhs(25, samples=sample_size)
+    #apply means and stds to distribution
+    LSTD = np.array(loads)*1/3
+    for i in range(25):
+        design[:, i] = norm(loc=LOADS[i], scale=LSTD[i]).ppf(design[:, i])
+
+    #correct nana entry
+    design[:,0] = 0
+
+    return design
 
 def solve_model(solver, model):
     """
