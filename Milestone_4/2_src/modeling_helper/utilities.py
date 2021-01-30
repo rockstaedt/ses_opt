@@ -145,7 +145,8 @@ def get_loads():
 
 def get_path_by_task(mc_sampling:bool, av_sampling:bool, lhc_sampling:bool,
                      ev:bool, deterministic:bool, sensitivity_analysis:bool,
-                     sample_size:int, current_path:Path) -> str:
+                     sample_size:int, multiprocessing: bool,
+                     current_path:Path) -> str:
     """
     Based on the model options, this function returns the corresponding path.
 
