@@ -8,7 +8,7 @@ from typing import Dict
 
 from .printing import print_status
 
-def get_monte_carlo_samples(values:list, samples=1000, seed=12):
+def get_monte_carlo_samples(values:list, sample_size=1000, seed=12):
     """
     This function creates a monte carlo sample of size samples. For every
     element in values, a sample is drawn from a normal distribution with the
@@ -20,7 +20,7 @@ def get_monte_carlo_samples(values:list, samples=1000, seed=12):
     cov_pl = np.diagflat(np.array(values)*1/3)
 
     # return random samples from normal distribution
-    return np.random.multivariate_normal(values, cov_pl, size=samples)
+    return np.random.multivariate_normal(values, cov_pl, size=sample_size)
 
 def get_av_samples(values:list, sample_size=1000, seed=12):
     """
@@ -31,26 +31,30 @@ def get_av_samples(values:list, sample_size=1000, seed=12):
     # Covariance matrix of values. Variance was given.
     cov_pl = np.diagflat(np.array(values)*1/3)
     # Calculate normal distribution for half of the sample size.
-    normal_dis = np.random.multivariate_normal(values, cov_pl, size=int(sample_size/2))
+    normal_dis = np.random.multivariate_normal(
+        values,
+        cov_pl,
+        size=int(sample_size/2)
+    )
     # Calculate athetics of these sample
     antithetics = np.array(values) - (normal_dis - np.array(values))
     # Concatenate both samples to one.
     samples = np.concatenate((normal_dis, antithetics))
     return samples
 
-def get_lhs_sample(sample_size = 1000,loads = LOADS,seed = 12):
+def get_lhs_sample(values:list, sample_size=1000, seed=12):
     """
-    This function creates a vector of samples using the Latin Hypercube technique.
+    This function creates a vector of samples using the Latin Hypercube
+    technique.
     """
 
     sample_vectors = []
     np.random.seed(seed)
-    for i in loads:
+    for value in values:
         help_array = []
-        mean = i
-        std = np.sqrt(i*(1/3))
-        mn = mean-std*3     #intervall of 99.73 values
-        mx = mean+std*3
+        std = np.sqrt(value*(1/3))
+        mn = value-std*3     #intervall of 99.73 values
+        mx = value+std*3
 
         points = np.linspace(mn, mx, num=sample_size+1)
         intervals = np.array([points[:-1], points[1:]]).transpose()
