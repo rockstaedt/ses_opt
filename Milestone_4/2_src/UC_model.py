@@ -37,13 +37,19 @@ else:
     if mc_sampling:
         SAMPLES = get_monte_carlo_samples(
             LOADS,
-            samples=sample_size,
+            sample_size=sample_size,
             seed=seed
         )
     elif av_sampling:
         SAMPLES = get_av_samples(
             LOADS,
-            samples=sample_size,
+            sample_size=sample_size,
+            seed=seed
+        )
+    elif lhc_sampling:
+        SAMPLES = get_lhc_samples(
+            LOADS,
+            sample_size=sample_size,
             seed=seed
         )
 
@@ -493,6 +499,7 @@ for charge_target in charge_targets:
         deterministic,
         sensitivity_analysis,
         sample_size,
+        multiprocessing,
         current_path)
 
     # Make sure that folders exist
@@ -509,6 +516,14 @@ for charge_target in charge_targets:
             os.path.join(path, f'results_sub_{charge_target}.json'),
             'w') as outfile:
             last_key = list(results_sub.keys())[-1]
+            # Check for variables containing a tuple key.
+            for variable in results_sub[last_key]:
+                first_key = list(results_sub[last_key][variable].keys())[0]
+                if type(first_key) == tuple:
+                    # Reset all keys for that variable.
+                    results_sub[last_key][variable] = reset_tuple_key(
+                        results_sub[last_key][variable]
+                    )
             json.dump(results_sub[last_key], outfile)
 
         with open(
