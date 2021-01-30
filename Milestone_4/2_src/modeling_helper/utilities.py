@@ -58,10 +58,10 @@ def get_lhs_sample(sample_size = 1000,loads = LOADS,seed = 12):
         for j in range(sample_size):
             x = np.random.uniform(intervals[j][0],intervals[j][1],1)[0]
             help_array.append(x)
-        
+
         np.random.shuffle(help_array)
         sample_vectors.append(help_array)
-        
+
     sample_vectors = np.array(sample_vectors)
 
     return  sample_vectors.transpose()
@@ -287,3 +287,18 @@ def set_load_values(model:pyo.ConcreteModel, load_values:list):
     """
     for i, load_value in enumerate(load_values):
         model.load_values[i] = load_value
+
+def reset_tuple_key(dic: Dict) -> Dict:
+    """
+    This function resets a dictionary with a tuple key (storage_type, hour)
+    to a dicationary with storage types as keys containing a dictionary of
+    hours.
+    """
+    return_dic = {}
+    for key_one, key_two in list(dic.keys()):
+        if key_one in return_dic:
+            return_dic[key_one][key_two] = dic[(key_one, key_two)]
+        else:
+            return_dic[key_one] = {}
+            return_dic[key_one][key_two] = dic[(key_one, key_two)]
+    return return_dic
