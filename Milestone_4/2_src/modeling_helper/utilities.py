@@ -40,21 +40,31 @@ def get_av_samples(values:list, sample_size=1000, seed=12):
 
 def get_lhs_sample(sample_size = 1000,loads = LOADS,seed = 12):
     """
-    This function creates a sample using the latin hyper cube technique.
+    This function creates a vector of samples using the Latin Hypercube technique.
     """
-    #set seed
+
+    sample_vectors = []
     np.random.seed(seed)
-    #pull lhs distribution
-    design = lhs(25, samples=sample_size)
-    #apply means and stds to distribution
-    LSTD = np.array(loads)*1/3
-    for i in range(25):
-        design[:, i] = norm(loc=LOADS[i], scale=LSTD[i]).ppf(design[:, i])
+    for i in loads:
+        help_array = []
+        mean = i
+        std = np.sqrt(i*(1/3))
+        mn = mean-std*3     #intervall of 99.73 values
+        mx = mean+std*3
 
-    #correct nana entry
-    design[:,0] = 0
+        points = np.linspace(mn, mx, num=sample_size+1)
+        intervals = np.array([points[:-1], points[1:]]).transpose()
 
-    return design
+        for j in range(sample_size):
+            x = np.random.uniform(intervals[j][0],intervals[j][1],1)[0]
+            help_array.append(x)
+        
+        np.random.shuffle(help_array)
+        sample_vectors.append(help_array)
+        
+    sample_vectors = np.array(sample_vectors)
+
+    return  sample_vectors.transpose()
 
 def solve_model(solver, model):
     """
