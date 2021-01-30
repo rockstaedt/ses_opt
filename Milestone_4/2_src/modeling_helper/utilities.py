@@ -42,7 +42,7 @@ def get_av_samples(values:list, sample_size=1000, seed=12):
     samples = np.concatenate((normal_dis, antithetics))
     return samples
 
-def get_lhc_sample(values:list, sample_size=1000, seed=12):
+def get_lhc_samples(values:list, sample_size=1000, seed=12):
     """
     This function creates a vector of samples using the Latin Hypercube
     technique.
