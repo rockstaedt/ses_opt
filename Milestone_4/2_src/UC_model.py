@@ -492,15 +492,15 @@ for charge_target in charge_targets:
     current_path = Path.cwd()
 
     path = get_path_by_task(
-        mc_sampling,
-        av_sampling,
-        lhc_sampling,
-        ev,
-        deterministic,
-        sensitivity_analysis,
-        sample_size,
-        multiprocessing,
-        current_path)
+        mc_sampling=mc_sampling,
+        av_sampling=av_sampling,
+        lhc_sampling=lhc_sampling,
+        ev=ev,
+        deterministic=deterministic,
+        sensitivity_analysis=sensitivity_analysis,
+        sample_size=sample_size,
+        multiprocessing=multiprocessing,
+        current_path=current_path)
 
     # Make sure that folders exist
     if not os.path.exists(path):
