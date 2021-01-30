@@ -350,18 +350,6 @@ for charge_target in charge_targets:
 
     print(f'Solving sub problem for samples size = {sample_size}')
 
-    # Use concurrent package to enable multiprocessing to solve sample in
-    # paralell.
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = executor.map(
-            solve_sample,
-            SAMPLES,
-            list(range(len(SAMPLES))),
-            [len(SAMPLES)] * len(SAMPLES),
-            [sub] * len(SAMPLES),
-            [opt] * len(SAMPLES)
-        )
-
     if multiprocessing:
         # Use concurrent package to enable multiprocessing to solve test samples
         # in parallel.
