@@ -271,7 +271,6 @@ for approach in APPROACHES:
             ), 'w') as outfile:
             # Check for variables containing a tuple key.
             for sample in results_dic[approach]:
-                print(sample)
                 for var in results_dic[approach][sample]:
                     # Key 'objective_value' does not contain any keys.
                     if var != 'objective_value':
