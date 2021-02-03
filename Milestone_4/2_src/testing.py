@@ -32,13 +32,13 @@ multiprocessing = True
 seed = 17
 
 # Get test samples.
-TEST_SAMPLES = get_monte_carlo_samples(LOADS, samples=test_size, seed=seed)
+TEST_SAMPLES = get_monte_carlo_samples(LOADS, sample_size=test_size, seed=seed)
 
 # Define a list of approaches.
 APPROACHES = ['stochastic', 'deterministic']
 
-# Define storage level for testing
-stor_level_max = 4
+# Define charge target for ev
+charge_target = 0.8
 
 # All other parameteres are defined in the file 'parameters.py'
 
@@ -61,28 +61,32 @@ for approach in APPROACHES:
         deterministic = False
     else:
         deterministic = True
-    path = get_path_by_task(
-        up_down_time,
-        ramping,
-        esr,
-        deterministic,
-        sensitivity_analysis,
-        sample_size,
-        current_path)
 
-    print_caption(f'Solution for {stor_level_max} kWh')
+    path = get_path_by_task(
+        mc_sampling=mc_sampling,
+        av_sampling=av_sampling,
+        lhc_sampling=lhc_sampling,
+        ev=ev,
+        deterministic=deterministic,
+        sensitivity_analysis=sensitivity_analysis,
+        sample_size=sample_size,
+        multiprocessing=multiprocessing,
+        current_path=current_path
+    )
+
+    print_caption(f'Solution for {charge_target} kWh')
 
     # Open result model json file
     try:
         with open(
-            os.path.join(path, f'results_master_{stor_level_max}.json')
+            os.path.join(path, f'results_master_{charge_target}.json')
             ) as f:
             # returns JSON object as a dictionary
             parameter = json.load(f)
     except:
         print(
             'Attention! File '
-            + os.path.join(path, f'results_master_{stor_level_max}.json')
+            + os.path.join(path, f'results_master_{charge_target}.json')
             + ' not found.'
         )
         break
@@ -101,6 +105,9 @@ for approach in APPROACHES:
     # Hour sets
     model.H = pyo.RangeSet(1,len(HOURS)-1)
     model.H_all = pyo.RangeSet(0, len(HOURS)-1)
+
+    # Set of energy storage resources.
+    model.ESR = pyo.Set(initialize=esr_types)
 
     # **************************************************************************
     # Parameter
@@ -130,20 +137,38 @@ for approach in APPROACHES:
     # Initialization for p1
     model.p2[0].fix(0)
 
-    if esr:
-        # Net injection by storage
-        model.stor_net_i = pyo.Var(model.H_all, bounds=(-p_w_max, p_i_max))
-        # Initialization for net injection
-        model.stor_net_i[0].fix(0)
+    # Net injection by storage with bounds of maximum charge and discharge.
+    # Create function to get the bounds for corresponding ESR.
+    def get_net_bounds(model, ESR, H):
+        return (-esr_to_p_w_max[ESR], esr_to_p_i_max[ESR])
+    model.stor_net_i = pyo.Var(
+        model.ESR,
+        model.H_all,
+        bounds=get_net_bounds
+    )
+    # Initialization of storage net injection for all ESR.
+    for esr in esr_types:
+        model.stor_net_i[esr, 0].fix(0)
 
-        # Storage level
-        model.stor_level = pyo.Var(
-            model.H_all,
-            within=pyo.NonNegativeReals,
-            bounds=(0, stor_level_max)
+    # Storage level in kWh
+    # Create function to get max storage level for corresponding ESR.
+    def get_stor_levels(model, ESR, H):
+        return (0, esr_to_stor_level_max[ESR])
+    model.stor_level = pyo.Var(
+        model.ESR,
+        model.H_all,
+        within=pyo.NonNegativeReals,
+        bounds=get_stor_levels
+    )
+    # Initialization of storage level for all ESR.
+    for esr in esr_types:
+        model.stor_level[esr, 0].fix(esr_to_stor_level_zero[esr])
+
+    if ev:
+        # Ensure charge target for ev in the last hour.
+        model.stor_level['ev', model.H_all[-1]].fix(
+            esr_to_stor_level_max['ev'] * charge_target
         )
-        # Initialization for net injection
-        model.stor_level[0].fix(0)
 
     # **************************************************************************
     # Objective function
@@ -160,79 +185,35 @@ for approach in APPROACHES:
     # Constraints
     # **************************************************************************
 
-    if up_down_time:
-        # Minimum uptime constraint
-        def min_uptime(model, H):
-            # Apply minimum uptime constraint.
-            # The end value of the range function needs to be increased
-            # to be included.
-            V = list(range(H, min([H-1 + uptime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0
-            # because range(24,24). To include hour 24 into the list,
-            # check for length and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint
-            # for all hours in V.
-            return sum(
-                model.u[H] - model.u[H-1] for v in V
-                ) <= sum(model.u[v] for v in V)
-        model.min_uptime = pyo.Constraint(model.H, rule=min_uptime)
+    # Load must be covered by production, purchasing electrictiy or by the
+    # sum of net injections over all esr.
+    def con_load(model, H):
+        return (model.pg[H] + model.p1[H] + model.p2[H]
+            + sum(model.stor_net_i[esr, H] for esr in model.ESR)
+            ) >= model.load_values[H]
+    model.con_load = pyo.Constraint(model.H, rule=con_load)
 
-        # Minimum downtime constraint
-        def min_downtime(model, H):
-            # Apply minimum downtime constraint.
-            # The end value of the range function needs to be increased
-            # to be included.
-            V = list(range(H, min([H-1 + downtime, len(HOURS)-1]) + 1))
-            # For the last hour, the ouput of the range function is 0
-            # because range(24,24). To include hour 24 into the list,
-            # check for length and put hour 24 into V.
-            if len(V) == 0:
-                V = [H]
-            # Return the sum of all hours in V to apply the constraint
-            # for all hours in V.
-            return sum(
-                model.u[H-1] - model.u[H] for v in V
-                ) <= sum(1 - model.u[v] for v in V)
-        model.min_downtime = pyo.Constraint(model.H, rule=min_downtime)
-
-    if esr:
-        # Load must be covered by production, purchasing electrictiy or
-        # by net injection of storage system.
-        def con_load(model, H):
-            return (model.pg[H] + model.p1[H] + model.p2[H]
-                + model.stor_net_i[H]) >= model.load_values[H]
-        model.con_load = pyo.Constraint(model.H, rule=con_load)
-    else:
-        # Load must be covered by production or purchasing electrictiy.
-        def con_load(model, H):
-            return (model.pg[H] + model.p1[H]
-                    + model.p2[H]) >=  model.load_values[H]
-        model.con_load = pyo.Constraint(model.H, rule=con_load)
-
-    # maximum capacity of generator
+    # Maximum capacity of generator
     def con_max(model, H):
         return model.pg[H] <= pmax*model.u[H]
     model.con_max = pyo.Constraint(model.H, rule=con_max)
 
-    if ramping:
-        # Ramping constraint of generator
-        def con_ramping(model, H):
-            return (
-                -ramping_constraint,
-                model.pg[H] - model.pg[H-1],
-                ramping_constraint
-            )
-        model.con_ramping = pyo.Constraint(model.H, rule=con_ramping)
+    # Ramping constraint of generator
+    def con_ramping(model, H):
+        return (
+            -ramping_constraint, model.pg[H] - model.pg[H-1], ramping_constraint
+        )
+    model.con_ramping = pyo.Constraint(model.H, rule=con_ramping)
 
-    if esr:
-        # Storage Balance
-        def stor_balance(model, H):
-            return model.stor_level[H] == (
-                model.stor_level[H-1] - model.stor_net_i[H]
-            )
-        model.stor_balance = pyo.Constraint(model.H, rule=stor_balance)
+    # Storage Balance
+    def stor_balance(model, ESR, H):
+        return model.stor_level[ESR, H] == (
+            model.stor_level[ESR, H-1] - model.stor_net_i[ESR, H])
+    model.stor_balance = pyo.Constraint(model.ESR, model.H, rule=stor_balance)
+
+    # **************************************************************************
+    # Initialization
+    # **************************************************************************
 
     if multiprocessing:
         # Use concurrent package to enable multiprocessing to solve test samples
@@ -286,8 +267,22 @@ for approach in APPROACHES:
         with open(
             os.path.join(
                 saving_path,
-                f'testing_results_{stor_level_max}_{test_size}.json'
+                f'testing_results_{charge_target}_{test_size}.json'
             ), 'w') as outfile:
+            # Check for variables containing a tuple key.
+            for sample in results_dic[approach]:
+                print(sample)
+                for var in results_dic[approach][sample]:
+                    # Key 'objective_value' does not contain any keys.
+                    if var != 'objective_value':
+                        first_key = list(
+                            results_dic[approach][sample][var].keys()
+                        )[0]
+                        if type(first_key) == tuple:
+                            # Reset all keys for that variable.
+                            results_dic[approach][sample][var] = reset_tuple_key(
+                                results_dic[approach][sample][var]
+                            )
             json.dump(results_dic[approach], outfile)
 
         #-----------------------------------------------------------------------
@@ -298,7 +293,7 @@ for approach in APPROACHES:
         np.array(objective_values[approach]).tofile(
             os.path.join(
                 saving_path,
-                f'objective_values_{stor_level_max}_{test_size}.csv'),
+                f'objective_values_{charge_target}_{test_size}.csv'),
             sep=','
         )
 
@@ -307,7 +302,7 @@ for approach in APPROACHES:
         pd.DataFrame({'Mean': [mean], 'Variance': [variance]}).to_csv(
             os.path.join(
                 saving_path,
-                f'mean_var_{stor_level_max}_{test_size}.csv'),
+                f'mean_var_{charge_target}_{test_size}.csv'),
             sep=',',
             index=False
         )
