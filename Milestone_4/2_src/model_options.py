@@ -6,8 +6,8 @@
 # approch is performed.
 deterministic = True
 
-# This option enables sensitivity analysis regarding the storage capacity from
-# 0 to 20 kWh in steps of 4 kWh
+# This option enables sensitivity analysis regarding the charge target of the
+# ev from 20% to 100% in steps of 10%.
 sensitivity_analysis = False
 
 # This option enables the output of result files, saved into '3_results'.
