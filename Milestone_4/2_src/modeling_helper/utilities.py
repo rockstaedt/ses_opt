@@ -236,6 +236,7 @@ def get_path_by_task(mc_sampling:bool, av_sampling:bool, lhc_sampling:bool,
                 '3_results',
                 'stochastic',
                 'task_5',
+                'av_sampling',
                 'sensitivity_analysis',
                 str(sample_size)
             )
