@@ -22,7 +22,7 @@ current_path = Path.cwd()
 
 # Model options are defined in the file 'model_options.py'.
 
-multiprocessing = True
+multiprocessing_testing = True
 
 # ******************************************************************************
 # Parameters
@@ -215,7 +215,7 @@ for approach in APPROACHES:
     # Initialization
     # **************************************************************************
 
-    if multiprocessing:
+    if multiprocessing_testing:
         # Use concurrent package to enable multiprocessing to solve test samples
         # in parallel.
         with concurrent.futures.ProcessPoolExecutor() as executor:
