@@ -5,6 +5,8 @@ import numpy as np
 import os
 from pathlib import Path
 from typing import Dict
+from scipy.stats import norm
+import scipy.stats
 
 from .printing import print_status
 
@@ -48,27 +50,48 @@ def get_lhc_samples(values:list, sample_size=1000, seed=12):
     technique.
     """
 
-    sample_vectors = []
+    sample_vector = []
+    
     np.random.seed(seed)
-    for value in values:
+    for v in values:
+
+        perc_arr = []
         help_array = []
-        std = np.sqrt(value*(1/3))
-        mn = value-std*3     #intervall of 99.73 values
-        mx = value+std*3
 
-        points = np.linspace(mn, mx, num=sample_size+1)
-        intervals = np.array([points[:-1], points[1:]]).transpose()
+        if v == 0:
+            help_array = np.zeros(sample_size)
+        else:
+            value = v
+            std = np.sqrt(value*(1/3))
+            #mn = value-std*3     
+            #mx = value+std*3
 
-        for j in range(sample_size):
-            x = np.random.uniform(intervals[j][0],intervals[j][1],1)[0]
-            help_array.append(x)
+
+            i = 0
+            perc = 1/sample_size
+            while i < 1:
+                perc_arr.append(i)
+                i += perc
+
+            if len(perc_arr) != sample_size+1:
+                perc_arr.append(0.999999999999999)
+
+            perc_arr[0] += 0.0000000000000001
+            perc_arr
+
+            for j in range(len(perc_arr)-1):
+                x = np.random.uniform(norm.ppf(perc_arr[j], loc=value, scale = np.sqrt(value*(1/3))),norm.ppf(perc_arr[j+1], loc=value, scale = np.sqrt(value*(1/3))))
+                help_array.append(x)
+
 
         np.random.shuffle(help_array)
-        sample_vectors.append(help_array)
+        sample_vector.append(np.array(help_array))
 
-    sample_vectors = np.array(sample_vectors)
 
-    return  sample_vectors.transpose()
+    sample_vector = np.array(sample_vector)
+    sample_vector = sample_vector.transpose()
+
+    return  sample_vector
 
 def solve_model(solver, model):
     """
