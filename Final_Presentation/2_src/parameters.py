@@ -36,44 +36,43 @@ l1 = 0.25
 l2 = 0.3
 
 # Storage types
-if ev:
-    esr_types = ['battery', 'ev']
-else:
-    esr_types = ['battery']
+esr_types = ['battery', 'ev_1', 'ev_2', 'ev_3']
 
 # Maximum charging power of storage in kW
 esr_to_p_w_max = {
-    'battery': 10,
-    'ev': 11
+    esr_type: 11 if 'ev' in esr_type else 10 for esr_type in esr_types
 }
 
 # Maxium discharging power of storage in kW
 esr_to_p_i_max = {
-    'battery': 10,
-    'ev': 11
+    esr_type: 11 if 'ev' in esr_type else 10 for esr_type in esr_types
 }
 
 # Maximum storage level in kWh
 esr_to_stor_level_max = {
-    'battery': 5,
-    'ev': 38
+    esr_type: 38 if 'ev' in esr_type else 5 for esr_type in esr_types
 }
 
-# Initial storage level
+# Initial storage level in kWh
 esr_to_stor_level_zero = {
-    'battery': 0,
-    'ev': 0.2*esr_to_stor_level_max['ev']
+    esr_type: 0.3*esr_to_stor_level_max[esr_type] if (
+        'ev' in esr_type ) else 0 for esr_type in esr_types
 }
 
-# Charge target of storages
-# This parameter is part of a sensitivity analysis from 20% to 100% in steps
-# of 10%. Therefore the parameter is defined as a list in case of a sensitivity
-# analysis. If no sensitivity analysis is performed, the intial value of 80%
-# is used.
-if sensitivity_analysis:
-    charge_targets = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-else:
-    charge_targets = [0.8]
+# Charge target of ev in %
+charge_target = 0.6
+
+# Hour when EVs are plugged in
+plug_in_hour = 8
+
+# Hour when EVs are plugged out
+plug_out_hour = 17
+
+# Value for minimum state of charge in % of maximum capacity
+min_soc = 0.2
+
+# Value for maximum state of charge in % of maximum capacity
+max_soc = 0.8
 
 # Load values in kW
 LOADS = get_loads()

@@ -19,8 +19,8 @@ from model_options import output
 
 settings = {
     'text.usetex': True,
-    'font.weight' : 'normal',
-    'font.size'   : 14
+    'font.weight': 'normal',
+    'font.size': 14
 }
 plt.rcParams.update(**settings)
 
