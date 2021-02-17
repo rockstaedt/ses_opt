@@ -285,7 +285,7 @@ sub.stor_level = pyo.Var(
     within=pyo.NonNegativeReals,
     bounds=get_stor_levels
 )
-# Initialization of storage level for all ESR.
+# Initialization of storage level and net injections for all ESR.
 for esr_type in esr_types:
     if 'ev' in esr_type:
         for h in sub.H_all:
@@ -294,11 +294,6 @@ for esr_type in esr_types:
                 # plugged in and after ev is plugged out.
                 sub.stor_level[esr_type, h].fix(0)
                 sub.stor_net_i[esr_type, h].fix(0)
-        # # Fix initial stor level.
-        # sub.stor_level[esr_type, plug_in_hour].fix(
-        #     esr_to_stor_level_zero[esr_type]
-        # )
-        # Fix final storage level.
         sub.stor_level[esr_type, plug_out_hour].fix(
             charge_target * esr_to_stor_level_max[esr_type]
         )
@@ -506,10 +501,7 @@ current_path = Path.cwd()
 path = get_path_by_task(
     mc_sampling=mc_sampling,
     av_sampling=av_sampling,
-    lhc_sampling=lhc_sampling,
-    ev=ev,
     deterministic=deterministic,
-    sensitivity_analysis=sensitivity_analysis,
     sample_size=sample_size,
     multiprocessing=multiprocessing,
     current_path=current_path)
