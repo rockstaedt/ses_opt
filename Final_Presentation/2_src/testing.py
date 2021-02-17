@@ -38,7 +38,7 @@ TEST_SAMPLES = get_monte_carlo_samples(LOADS, sample_size=test_size, seed=seed)
 APPROACHES = ['stochastic', 'deterministic']
 
 # Define charge target for ev
-charge_target = 0.8
+charge_target = 0.6
 
 # All other parameteres are defined in the file 'parameters.py'
 
@@ -65,16 +65,13 @@ for approach in APPROACHES:
     path = get_path_by_task(
         mc_sampling=mc_sampling,
         av_sampling=av_sampling,
-        lhc_sampling=lhc_sampling,
-        ev=ev,
         deterministic=deterministic,
-        sensitivity_analysis=sensitivity_analysis,
         sample_size=sample_size,
         multiprocessing=multiprocessing,
         current_path=current_path
     )
 
-    print_caption(f'Solution for {charge_target} kWh')
+    print_caption(f'Solution for {charge_target*100} %')
 
     # Open result model json file
     try:
@@ -146,29 +143,40 @@ for approach in APPROACHES:
         model.H_all,
         bounds=get_net_bounds
     )
-    # Initialization of storage net injection for all ESR.
-    for esr in esr_types:
-        model.stor_net_i[esr, 0].fix(0)
 
     # Storage level in kWh
     # Create function to get max storage level for corresponding ESR.
-    def get_stor_levels(model, ESR, H):
-        return (0, esr_to_stor_level_max[ESR])
+    def get_stor_levels(sub, ESR, H):
+        if 'ev' not in ESR:
+            return (0, esr_to_stor_level_max[ESR])
+        else:
+            if H < plug_in_hour or H > plug_out_hour:
+                return (0,0)
+            else:
+                return (
+                    min_soc*esr_to_stor_level_max[ESR],
+                    max_soc*esr_to_stor_level_max[ESR]
+                )
     model.stor_level = pyo.Var(
         model.ESR,
         model.H_all,
         within=pyo.NonNegativeReals,
         bounds=get_stor_levels
     )
-    # Initialization of storage level for all ESR.
-    for esr in esr_types:
-        model.stor_level[esr, 0].fix(esr_to_stor_level_zero[esr])
-
-    if ev:
-        # Ensure charge target for ev in the last hour.
-        model.stor_level['ev', model.H_all[-1]].fix(
-            esr_to_stor_level_max['ev'] * charge_target
-        )
+    # Initialization of storage level and net injections for all ESR.
+    for esr_type in esr_types:
+        if 'ev' in esr_type:
+            for h in model.H_all:
+                if h < plug_in_hour or h > plug_out_hour:
+                    # Fix stor level and net injection values to zero before ev
+                    # is plugged in and after ev is plugged out.
+                    model.stor_level[esr_type, h].fix(0)
+                    model.stor_net_i[esr_type, h].fix(0)
+            model.stor_level[esr_type, plug_out_hour].fix(
+                charge_target * esr_to_stor_level_max[esr_type]
+            )
+        else:
+            model.stor_level[esr_type, 0].fix(esr_to_stor_level_zero[esr_type])
 
     # **************************************************************************
     # Objective function
@@ -206,9 +214,21 @@ for approach in APPROACHES:
     model.con_ramping = pyo.Constraint(model.H, rule=con_ramping)
 
     # Storage Balance
-    def stor_balance(model, ESR, H):
-        return model.stor_level[ESR, H] == (
-            model.stor_level[ESR, H-1] - model.stor_net_i[ESR, H])
+    def stor_balance(sub, ESR, H):
+        if 'ev' not in ESR:
+            return sub.stor_level[ESR, H] == (
+                sub.stor_level[ESR, H-1] - sub.stor_net_i[ESR, H])
+        else:
+            if H > plug_in_hour and H <= plug_out_hour:
+                return sub.stor_level[ESR, H] == (
+                    sub.stor_level[ESR, H-1] - sub.stor_net_i[ESR, H]
+                )
+            if H == plug_in_hour:
+                return sub.stor_level[ESR, H] == (
+                    esr_to_stor_level_zero[ESR] - sub.stor_net_i[ESR, H]
+                )
+            else:
+                return pyo.Constraint.Skip
     model.stor_balance = pyo.Constraint(model.ESR, model.H, rule=stor_balance)
 
     # **************************************************************************
