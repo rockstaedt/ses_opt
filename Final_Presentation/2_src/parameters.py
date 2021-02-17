@@ -3,7 +3,6 @@
 ###############################################################################
 
 from modeling_helper.utilities import *
-from model_options import sensitivity_analysis, ev
 
 # Size of monte carlo sample
 sample_size = 10
