@@ -205,15 +205,13 @@ def get_path_by_task(mc_sampling:bool, av_sampling:bool, deterministic:bool,
         if not mc_sampling and av_sampling:
             path = os.path.join(
                 path,
-                'task_1',
-                'b',
+                'task_1_b',
                 str(sample_size)
             )
         elif mc_sampling and not av_sampling:
             path = os.path.join(
                 path,
-                'task_1',
-                'c',
+                'task_1_c',
                 str(sample_size)
             )
         else:
