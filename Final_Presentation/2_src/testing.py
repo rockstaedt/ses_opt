@@ -146,7 +146,7 @@ for approach in APPROACHES:
 
     # Storage level in kWh
     # Create function to get max storage level for corresponding ESR.
-    def get_stor_levels(sub, ESR, H):
+    def get_stor_levels(model, ESR, H):
         if 'ev' not in ESR:
             return (0, esr_to_stor_level_max[ESR])
         else:
@@ -214,18 +214,18 @@ for approach in APPROACHES:
     model.con_ramping = pyo.Constraint(model.H, rule=con_ramping)
 
     # Storage Balance
-    def stor_balance(sub, ESR, H):
+    def stor_balance(model, ESR, H):
         if 'ev' not in ESR:
-            return sub.stor_level[ESR, H] == (
-                sub.stor_level[ESR, H-1] - sub.stor_net_i[ESR, H])
+            return model.stor_level[ESR, H] == (
+                model.stor_level[ESR, H-1] - model.stor_net_i[ESR, H])
         else:
             if H > plug_in_hour and H <= plug_out_hour:
-                return sub.stor_level[ESR, H] == (
-                    sub.stor_level[ESR, H-1] - sub.stor_net_i[ESR, H]
+                return model.stor_level[ESR, H] == (
+                    model.stor_level[ESR, H-1] - model.stor_net_i[ESR, H]
                 )
             if H == plug_in_hour:
-                return sub.stor_level[ESR, H] == (
-                    esr_to_stor_level_zero[ESR] - sub.stor_net_i[ESR, H]
+                return model.stor_level[ESR, H] == (
+                    esr_to_stor_level_zero[ESR] - model.stor_net_i[ESR, H]
                 )
             else:
                 return pyo.Constraint.Skip
