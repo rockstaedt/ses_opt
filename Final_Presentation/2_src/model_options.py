@@ -11,19 +11,16 @@ deterministic = True
 sensitivity_analysis = False
 
 # This option enables the output of result files, saved into '3_results'.
-output = False
+output = True
 
 # This option enables the sampling using Crude Monte Carlo.
-mc_sampling = True
+mc_sampling = False
 
 # This option enables the sampling using the Antithetic Variates technique.
-av_sampling = False
+av_sampling = True
 
 # This option enables the sampling using the Latin Hypercube Sampling technique.
 lhc_sampling = False
 
 # This option enables multiprocessing during the optimization.
 multiprocessing = True
-
-# This option enables the implementation of an electric vehicle.
-ev = True
