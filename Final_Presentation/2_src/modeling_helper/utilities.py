@@ -51,7 +51,7 @@ def get_lhc_samples(values:list, sample_size=1000, seed=12):
     """
 
     sample_vector = []
-    
+
     np.random.seed(seed)
     for v in values:
 
@@ -63,7 +63,7 @@ def get_lhc_samples(values:list, sample_size=1000, seed=12):
         else:
             value = v
             std = np.sqrt(value*(1/3))
-            #mn = value-std*3     
+            #mn = value-std*3
             #mx = value+std*3
 
 
@@ -170,8 +170,7 @@ def get_loads():
         0,8,8,10,10,10,16,22,24,26,32,30,28,22,18,16,16,20,24,28,34,38,30,22,12
     ]
 
-def get_path_by_task(mc_sampling:bool, av_sampling:bool, lhc_sampling:bool,
-                     ev:bool, deterministic:bool, sensitivity_analysis:bool,
+def get_path_by_task(mc_sampling:bool, av_sampling:bool, deterministic:bool,
                      sample_size:int, multiprocessing: bool,
                      current_path:Path) -> str:
     """
@@ -182,92 +181,44 @@ def get_path_by_task(mc_sampling:bool, av_sampling:bool, lhc_sampling:bool,
     """
     # Determine first level saving path
     if deterministic:
-        if (not ev and not sensitivity_analysis):
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'task_1_4')
-        elif (ev and not sensitivity_analysis):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'deterministic',
-                'task_5'
-            )
-        elif (ev and sensitivity_analysis):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'deterministic',
-                'task_5',
-                'sensitivity_analysis'
-            )
-        else:
-            path = os.path.join(
-                current_path.parent, '3_results', 'deterministic', 'no_task')
+        path = os.path.join(
+            current_path.parent,
+            '3_results',
+            'deterministic',
+            'task_1'
+        )
     else:
-        if (not mc_sampling and av_sampling and not lhc_sampling
-            and multiprocessing and not sensitivity_analysis and not ev):
+        if multiprocessing:
             path = os.path.join(
                 current_path.parent,
                 '3_results',
                 'stochastic',
-                'task_1',
-                str(sample_size)
-            )
-        elif (not mc_sampling and not av_sampling and lhc_sampling
-            and multiprocessing and not sensitivity_analysis and not ev):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_2',
-                str(sample_size)
-            )
-        elif (not mc_sampling and av_sampling and not lhc_sampling
-            and not multiprocessing and not sensitivity_analysis and not ev):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_4',
-                'av_sampling',
-                str(sample_size)
-            )
-        elif (not mc_sampling and not av_sampling and lhc_sampling
-            and not multiprocessing and not sensitivity_analysis and not ev):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_4',
-                'lhc_sampling',
-                str(sample_size)
-            )
-        elif (not mc_sampling and av_sampling and not lhc_sampling
-            and multiprocessing and not sensitivity_analysis and ev):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_5',
-                'av_sampling',
-                str(sample_size)
-            )
-        elif (not mc_sampling and av_sampling and not lhc_sampling
-            and multiprocessing and sensitivity_analysis and ev):
-            path = os.path.join(
-                current_path.parent,
-                '3_results',
-                'stochastic',
-                'task_5',
-                'av_sampling',
-                'sensitivity_analysis',
-                str(sample_size)
+                'multiprocessing'
             )
         else:
             path = os.path.join(
                 current_path.parent,
                 '3_results',
                 'stochastic',
+                'no_multiprocessing'
+            )
+        if not mc_sampling and av_sampling:
+            path = os.path.join(
+                path,
+                'task_1',
+                'b',
+                str(sample_size)
+            )
+        elif mc_sampling and not av_sampling:
+            path = os.path.join(
+                path,
+                'task_1',
+                'c',
+                str(sample_size)
+            )
+        else:
+            path = os.path.join(
+                path,
                 'no_task',
                 str(sample_size)
             )
