@@ -558,9 +558,6 @@ time_end_all = tm.time()
 times_dic['time'].append(time_end_all - time_start_all)
 print(f'\n\tComputation time: {round(time_end_all - time_start_all,2)}')
 times_dic['iterations'].append(iteration)
-if sensitivity_analysis:
-    print('Computation time for sensitivity analysis:')
-    print(f'\t{round(time_end_all - time_start_all, 2)}s')
 
 if output:
     # save computation times as csv
