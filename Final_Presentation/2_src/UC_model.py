@@ -25,7 +25,7 @@ time_start_all = tm.time()
 ### Parameters
 ###############################################################################
 
-# Seet for randomness
+# Seed for randomness
 seed = 12
 
 # For the deterministic approach, the normal load vector with its mean values
@@ -53,7 +53,7 @@ else:
             seed=seed
         )
 
-# All other parameteres are defined in the file 'parameters.py'
+# All other parameters are defined in the file 'parameters.py'
 
 ###############################################################################
 ### L-shape method
