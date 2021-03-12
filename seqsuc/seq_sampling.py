@@ -7,8 +7,12 @@ replication procedure (SRP), or the averaged two-replication procedure (A2RP)
 to estimate the gap and the sample variance.
 """
 
+from datetime import datetime
 import math
 import numpy as np
+import os
+import pandas as pd
+from pathlib import Path
 from random import randint
 
 from .l_shape import LShapeMethod
@@ -21,7 +25,8 @@ class SequentialSampling:
     This object is used to run a sequential sampling method.
     """
     def __init__(self, params: Parameter, sampling_method: str,
-                 multiprocessing: bool, estimator_method: str = 'SRP'):
+                 estimator_method: str = 'SRP', multiprocessing: bool = False,
+                 output: bool = False):
         """
         Init SequentialSampling object.
 
@@ -29,16 +34,18 @@ class SequentialSampling:
         :param sampling_method: Method to draw samples. Possible options:
         crude monte carlo ('MC'), antithetic variates ('AV'), latin hypercube
         sampling ('LHS').
-        :param multiprocessing: Enables multiprocessing while solving the
-        problem.
         :param estimator_method: Select the single replication procedure (SRP),
         or the averaged two-replication procedure (A2RP) to estimate the gap
-        and the sample variance.
+        and the sample variance. Defaults to 'SRP'.
+        :param multiprocessing: Enables multiprocessing while solving the
+        problem. Defaults tp 'False'.
+        :param output: Enables the output into results folder as csv.
         """
         self.params = params
         self.sampling_method = sampling_method
-        self.multiprocessing = multiprocessing
         self.estimator_method = estimator_method
+        self.multiprocessing = multiprocessing
+        self.output = output
 
         # Init variables
         # Gap estimator
@@ -65,6 +72,31 @@ class SequentialSampling:
         self.n = None
         # List of all sample sizes of the sequential sampling method
         self.ns = []
+
+        # Dataframe for exports
+        if self.output:
+            try:
+                self.results_df = pd.read_csv(
+                    os.path.join(
+                        str(Path.cwd()),
+                        'results',
+                        'results_seq_sampling.csv'
+                    )
+                )
+            except FileNotFoundError:
+                self.results_df = pd.DataFrame({
+                    'sampling_method': [],
+                    'estimator_method': [],
+                    'G': [],
+                    'SV': [],
+                    'T': [],
+                    'CI': [],
+                    'n': [],
+                    'm': [],
+                    'timestamp': []
+                })
+        else:
+            self.results_df = None
 
     def run_seq_sampling(self):
         """
@@ -214,6 +246,9 @@ class SequentialSampling:
             f'\n\tz_star={self.z_star}'
         )
 
+        if self.output:
+            self.__export_results()
+
     def __get_n_k(self):
         """
         This function calculates the sample size in iteration k.
@@ -224,7 +259,7 @@ class SequentialSampling:
                 * math.pow(self.__a_k(), -2) * math.pow(np.log(self.k), 2)
         )
         # Cut decimal points and increase by one to obtain an integer.
-        n_k = math.trunc(n_k) + 1
+        n_k = math.trunc(n_k) + 100
         if n_k % 4 != 0:
             # To get a sample size which divisible by four, modulo is
             # subtracted and 4 added.
@@ -247,7 +282,7 @@ class SequentialSampling:
         if self.k == 1:
             return self.m
         else:
-            return self.m + 200
+            return self.m + 100
 
     def __get_border(self):
         """
@@ -302,3 +337,52 @@ class SequentialSampling:
             )
 
         return g, sv
+
+    def __export_results(self):
+        """
+        This function exports the results of the sequential sampling method
+        into a csv file in the directory 'results'. In case they are already
+        results for a sampling method / estimator method combination, these
+        results are updated.
+        """
+        # Check if results already exist
+        if not self.results_df.loc[
+            (self.results_df.sampling_method == self.sampling_method)
+            & (self.results_df.estimator_method == self.estimator_method),
+            :
+        ].empty:
+            # Update results
+            self.results_df.loc[
+                (self.results_df.sampling_method == self.sampling_method)
+                & (self.results_df.estimator_method == self.estimator_method),
+                ['G', 'SV', 'T', 'CI', 'n', 'm', 'timestamp']
+            ] = [
+                self.G,
+                self.SV,
+                self.T,
+                self.CI,
+                self.n,
+                self.m,
+                datetime.now()
+            ]
+        else:
+            new_row = {
+                'sampling_method': self.sampling_method,
+                'estimator_method': self.estimator_method,
+                'G': self.G,
+                'SV': self.SV,
+                'T': self.T,
+                'CI': self.CI,
+                'n': self.n,
+                'm': self.m,
+                'timestamp': datetime.now()
+            }
+            self.results_df = self.results_df.append(new_row, ignore_index=True)
+
+        self.results_df.to_csv(
+            os.path.join(
+                'results',
+                'results_seq_sampling.csv'
+            ),
+            index=False
+        )
