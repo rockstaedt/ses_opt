@@ -210,8 +210,8 @@ class SequentialSampling:
         print_caption('End.')
 
         print(
-            f'Results:\n\tG={self.G}\n\tT={self.T}\n\tCI={self.CI=}'
-            f'\n\tz_star{self.z_star}'
+            f'Results:\n\tG={self.G}\n\tT={self.T}\n\tCI={self.CI}'
+            f'\n\tz_star={self.z_star}'
         )
 
     def __get_n_k(self):
