@@ -46,7 +46,7 @@ class Parameter:
         self.l2 = 0.3
 
         # Storage types
-        self.ESRS = ['battery']
+        self.ESRS = []
 
         # Maximum charging power of storage in kW
         self.esr_to_p_w_max = {
